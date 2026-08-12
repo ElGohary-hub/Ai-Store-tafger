@@ -1,6 +1,5 @@
 datasource db {
   provider = "mongodb"
-  url      = env("DATABASE_URL")
 }
 
 generator client {
@@ -16,23 +15,23 @@ model Admin {
 }
 
 model Product {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  name        String
-  detail      String?
-  price       Float
-  oldPrice    Float?   
-  image       String
-  isActive    Boolean  @default(true) 
-  order       Int      @default(0)    
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  detail    String?
+  price     Float
+  oldPrice  Float?
+  image     String
+  isActive  Boolean  @default(true)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model SiteSettings {
-  id           String   @id @default(auto()) @map("_id") @db.ObjectId
-  storeName    String   @default("AI STORE")
-  whatsapp     String   @default("201158413075")
-  heroTitle    String   @default("اختر الباقة المناسبة لك")
-  heroSubtitle String   @default("أفضل اشتراكات الذكاء الاصطناعي")
-  updatedAt    DateTime @updatedAt
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  storeName     String   @default("AI STORE")
+  whatsapp      String   @default("201158413075")
+  heroTitle     String   @default("اختر الباقة المناسبة لك")
+  heroSubtitle  String   @default("الذكاء الاصطناعي بين يديك")
+  updatedAt     DateTime @updatedAt
 }
