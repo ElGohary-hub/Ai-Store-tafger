@@ -7,7 +7,6 @@ generator client {
   provider = "prisma-client-js"
 }
 
-// جدول مدير الموقع
 model Admin {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   username  String   @unique
@@ -16,7 +15,6 @@ model Admin {
   updatedAt DateTime @updatedAt
 }
 
-// جدول المنتجات
 model Product {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
   name        String
@@ -30,7 +28,6 @@ model Product {
   updatedAt   DateTime @updatedAt
 }
 
-// جدول إعدادات الموقع
 model SiteSettings {
   id           String   @id @default(auto()) @map("_id") @db.ObjectId
   storeName    String   @default("AI STORE")
