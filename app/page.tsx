@@ -1,16 +1,53 @@
 "use client";
 
-import { useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 
 type Product = {
   id: string;
+  sku?: string;
   name: string;
-  detail: string;
+  description?: string;
+  detail?: string;
   price: number | string;
+  original_price?: number;
+  discount_enabled?: number;
+  discount_percentage?: number;
+  featured?: number;
+  best_seller?: number;
+  is_new?: number;
+  visible?: number;
+  stock?: number;
+  category_id?: number | null;
   image: string;
+  sort_order?: number;
+  tags?: string;
 };
 
-const PRODUCTS: Product[] = [
+type SettingsState = {
+  hero_title: string;
+  hero_description: string;
+  hero_image: string;
+  hero_button_text: string;
+  hero_button_url: string;
+  contact_whatsapp: string;
+  contact_phone: string;
+  contact_email: string;
+  currency: string;
+};
+
+const INITIAL_SETTINGS: SettingsState = {
+  hero_title: "اختر الباقة المناسبة لك",
+  hero_description: "اشتراكات مدعومة بتفعيل احترافي وخدمة عملاء سريعة.",
+  hero_image: "/p3.png",
+  hero_button_text: "اطلب الآن",
+  hero_button_url: "https://wa.me/201158413075?text=مرحباً",
+  contact_whatsapp: "https://wa.me/201158413075?text=مرحباً",
+  contact_phone: "01158413075",
+  contact_email: "info@aistore.com",
+  currency: "ج.م",
+};
+
+const DEFAULT_PRODUCTS: Product[] = [
   { id: "canva", name: "Canva Pro", detail: "اشتراك Canva Pro مدي الحياه والدفع بعد التفعيل. يتم التفعيل علي حسابك الشخصي وبشكل رسمي من كانفا!", price: 70, image: "/p3.png" },
   { id: "google", name: "Google Plan", detail: "تشمل: Gemini Pro, Antigravity, Nano Banana, NotebookLM, 5TB تخزين سحابي, Google Flow 1000 Credit/M", price: 70, image: "/p4.png" },
   { id: "capcut", name: "CapCut", detail: "التفعيل لمدة شهر فقط، تستلم حساب خاص فيك متفعل جاهز", price: 70, image: "/p10.png" },
@@ -29,9 +66,8 @@ const PRODUCTS: Product[] = [
   { id: "figma", name: "Figma", detail: "حسب الباقة، تواصل معي للتفاصيل", price: 70, image: "/p9.png" },
 ];
 
-// دالة منفصلة لعرض السعر بشكل لا يتأثر باتجاه الشاشة
 function formatPrice(p: number | string) {
-  if (typeof p === 'number') {
+  if (typeof p === "number") {
     return (
       <span className="flex items-center justify-center gap-1.5" dir="rtl">
         <span>{p} ج.م</span>
@@ -44,6 +80,8 @@ function formatPrice(p: number | string) {
 }
 
 export default function Home() {
+  const [products, setProducts] = useState<Product[]>(DEFAULT_PRODUCTS);
+  const [settings, setSettings] = useState<SettingsState>(INITIAL_SETTINGS);
   const [cart, setCart] = useState<Record<string, number>>({});
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -65,14 +103,36 @@ export default function Home() {
   const [selectedProductForBuy, setSelectedProductForBuy] = useState<Product | null>(null);
   const [isCheckoutFromCart, setIsCheckoutFromCart] = useState(false);
 
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [productsRes, settingsRes] = await Promise.all([
+          fetch("/api/public/products"),
+          fetch("/api/public/settings"),
+        ]);
+        if (productsRes.ok) {
+          const productData = await productsRes.json();
+          setProducts(productData);
+        }
+        if (settingsRes.ok) {
+          const settingsData = await settingsRes.json();
+          setSettings((prev) => ({ ...prev, ...settingsData }));
+        }
+      } catch (error) {
+        console.error("Failed to load public data:", error);
+      }
+    }
+    loadData();
+  }, []);
+
   const cartCount = useMemo(() => Object.values(cart).reduce((a, b) => a + b, 0), [cart]);
   
   const cartTotal = useMemo(() =>
     Object.entries(cart).reduce((sum, [id, qty]) => {
-      const p = PRODUCTS.find((p) => p.id === id);
+      const p = products.find((p) => p.id === id);
       return sum + (p && typeof p.price === 'number' ? p.price * qty : 0);
     }, 0),
-  [cart]);
+  [cart, products]);
 
   const binanceUsdAmount = useMemo(() => {
     if (isCheckoutFromCart) return cartCount * 2;
@@ -103,12 +163,12 @@ export default function Home() {
     
     if (isCheckoutFromCart) {
         Object.entries(cart).forEach(([id, qty]) => {
-            const p = PRODUCTS.find(x => x.id === id);
+            const p = products.find(x => x.id === id);
             if (p) orderText += `- ${p.name} x${qty}\n`;
         });
-        orderText += `\nالإجمالي الكلي:${cartTotal} ج.م\n\nرقم الهاتف المحول منه:${senderPhone}`;
+        orderText += `\nالإجمالي الكلي:${cartTotal} ${settings.currency || "ج.م"}\n\nرقم الهاتف المحول منه:${senderPhone}`;
     } else if (selectedProductForBuy) {
-        orderText += `-${selectedProductForBuy.name}\nالسعر:${selectedProductForBuy.price} ج.م\nرقم الهاتف المحول منه:${senderPhone}`;
+        orderText += `-${selectedProductForBuy.name}\nالسعر:${selectedProductForBuy.price} ${settings.currency || "ج.م"}\nرقم الهاتف المحول منه:${senderPhone}`;
     }
 
     if (receiptFile) {
@@ -132,7 +192,7 @@ export default function Home() {
       setIsUploadingImage(false);
     }
 
-    window.open(`https://wa.me/201158413075?text=${encodeURIComponent(orderText)}`, "_blank");
+    window.open(`${settings.contact_whatsapp || "https://wa.me/201158413075?text="}${encodeURIComponent(orderText)}`, "_blank");
     setIsVodafoneModalOpen(false);
     setIsPaymentModalOpen(false);
   }
@@ -155,7 +215,7 @@ export default function Home() {
       if (isCheckoutFromCart) {
         confirmationText += "\n";
         Object.entries(cart).forEach(([id, qty]) => {
-            const p = PRODUCTS.find(x => x.id === id);
+            const p = products.find(x => x.id === id);
             if (p) confirmationText += `- ${p.name} x${qty}\n`;
         });
         confirmationText += `رقم المعاملة :${txIdInput}`;
@@ -163,7 +223,7 @@ export default function Home() {
         confirmationText += `${selectedProductForBuy.name}\nرقم المعاملة :${txIdInput}`;
       }
 
-      window.open(`https://wa.me/201158413075?text=${encodeURIComponent(confirmationText)}`, "_blank");
+      window.open(`${settings.contact_whatsapp || "https://wa.me/201158413075?text="}${encodeURIComponent(confirmationText)}`, "_blank");
     }, 2000);
   }
 
@@ -179,15 +239,20 @@ export default function Home() {
           <div className="h-full w-full" style={{ backgroundImage: "repeating-linear-gradient(-45deg, #E8A33D 0, #E8A33D 2px, transparent 2px, transparent 25px)" }} />
         </div>
         <div className="mx-auto max-w-5xl px-6 text-center flex flex-col items-center">
-          <h2 className="mb-3 font-display text-3xl tracking-[0.2em] text-[#E8A33D] font-bold drop-shadow-[0_2px_10px_rgba(232,163,61,0.5)]">AI STORE</h2>
-          <h1 className="font-display text-4xl font-extrabold leading-tight text-white sm:text-5xl drop-shadow-[0_5px_15px_rgba(0,0,0,0.9)]">اختر الباقة المناسبة لك</h1>
+          <h2 className="mb-3 font-display text-3xl tracking-[0.2em] text-[#E8A33D] font-bold drop-shadow-[0_2px_10px_rgba(232,163,61,0.5)]">{settings.website_name || "AI STORE"}</h2>
+          <h1 className="font-display text-4xl font-extrabold leading-tight text-white sm:text-5xl drop-shadow-[0_5px_15px_rgba(0,0,0,0.9)]">{settings.hero_title}</h1>
+          <p className="mt-4 max-w-3xl text-base text-white/70">{settings.hero_description}</p>
+          <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+            <a href={settings.hero_button_url} className="rounded-3xl bg-gradient-to-r from-[#E8A33D] to-[#d69230] px-7 py-4 text-sm font-extrabold text-[#10131A] transition hover:brightness-110">{settings.hero_button_text}</a>
+            <a href={settings.contact_whatsapp} className="rounded-3xl border border-white/15 bg-white/5 px-7 py-4 text-sm font-bold text-white transition hover:bg-white/10">Contact WhatsApp</a>
+          </div>
         </div>
       </header>
 
       {/* المنتجات */}
       <section className="mx-auto max-w-5xl px-6 py-14">
         <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
-          {PRODUCTS.map((p) => (
+          {products.map((p) => (
             <article 
               key={p.id} 
               className="flex flex-col overflow-hidden rounded-3xl border border-white/15 bg-gradient-to-b from-[#1a1f2c] to-[#11141d] shadow-[0_15px_35px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.1)] transition-all duration-300 hover:scale-[1.03] hover:border-[#E8A33D]/60 hover:shadow-[0_20px_40px_rgba(232,163,61,0.2)]"
@@ -234,7 +299,7 @@ export default function Home() {
               {cartCount === 0 ? <div className="text-center text-white/50 py-12 text-lg">السلة فارغة حالياً</div> : 
                 <div className="flex flex-col gap-4">
                   {Object.entries(cart).map(([id, qty]) => {
-                    const p = PRODUCTS.find(x => x.id === id);
+                    const p = products.find(x => x.id === id);
                     if (!p) return null;
                     return (
                       <div key={id} className="flex flex-col bg-white/[0.04] p-4 rounded-2xl border border-white/10 shadow-[0_8px_20px_rgba(0,0,0,0.4)]">
@@ -483,7 +548,7 @@ export default function Home() {
       </button>
 
       {/* زر الواتساب العائم */}
-      <a href={`https://wa.me/201158413075?text=${encodeURIComponent("مرحباً، أحتاج مساعدة بخصوص متجر AI STORE")}`} target="_blank" rel="noopener noreferrer" style={{ ...floatingButtonStyle, bottom: "20px", background: "linear-gradient(135deg, #25D366 0%, #128C7E 100%)", color: "white" }}>
+      <a href={settings.contact_whatsapp} target="_blank" rel="noopener noreferrer" style={{ ...floatingButtonStyle, bottom: "20px", background: "linear-gradient(135deg, #25D366 0%, #128C7E 100%)", color: "white" }}>
         <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.888-.788-1.489-1.761-1.665-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.82 9.82 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
       </a>
     </main>
