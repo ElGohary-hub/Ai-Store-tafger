@@ -1,33 +1,65 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminBySessionToken } from "@/lib/auth";
-import db from "@/lib/db";
+import { getAuthAdmin } from "@/lib/auth";
+import { getDb } from "@/lib/mongodb";
+import { ObjectId } from "mongodb";
 
-function requireAdmin(req: NextRequest) {
-  const token = req.cookies.get("cms_token")?.value;
-  const admin = getAdminBySessionToken(token);
+async function requireAdmin(req: NextRequest) {
+  const admin = await getAuthAdmin(req);
   if (!admin) throw new Error("Unauthorized");
   return admin;
 }
 
 export async function GET(req: NextRequest) {
-  requireAdmin(req);
-  const search = req.nextUrl.searchParams.get("search")?.trim();
-  let orders = [];
-  if (search) {
-    orders = db.prepare("SELECT * FROM orders WHERE customer_name LIKE ? OR customer_email LIKE ? OR customer_phone LIKE ? ORDER BY created_at DESC").all(`%${search}%`, `%${search}%`, `%${search}%`);
-  } else {
-    orders = db.prepare("SELECT * FROM orders ORDER BY created_at DESC").all();
+  try {
+    await requireAdmin(req);
+    const search = req.nextUrl.searchParams.get("search")?.trim();
+    const db = await getDb();
+
+    let query: any = {};
+    if (search) {
+      query = {
+        $or: [
+          { customer_name: { $regex: search, $options: "i" } },
+          { customer_email: { $regex: search, $options: "i" } },
+          { customer_phone: { $regex: search, $options: "i" } },
+        ],
+      };
+    }
+
+    const orders = await db.collection("orders").find(query).sort({ created_at: -1, _id: -1 }).toArray();
+
+    return NextResponse.json(
+      orders.map((o) => ({
+        id: o._id.toString(),
+        customer_name: o.customer_name || "Guest",
+        customer_email: o.customer_email || "",
+        customer_phone: o.customer_phone || "",
+        status: o.status || "pending",
+        total: o.total || 0,
+        metadata: o.metadata || "",
+        created_at: o.created_at || new Date().toISOString(),
+      }))
+    );
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  return NextResponse.json(orders);
 }
 
 export async function PUT(req: NextRequest) {
-  requireAdmin(req);
-  const body = await req.json();
-  const { id, status } = body;
-  if (!id || !status) {
-    return NextResponse.json({ error: "ID and status are required." }, { status: 400 });
+  try {
+    await requireAdmin(req);
+    const body = await req.json();
+    const { id, status } = body;
+    if (!id || !status) {
+      return NextResponse.json({ error: "ID and status are required." }, { status: 400 });
+    }
+
+    const db = await getDb();
+    const query = ObjectId.isValid(id) ? { _id: new ObjectId(id) } : { _id: id };
+    await db.collection("orders").updateOne(query, { $set: { status, updatedAt: new Date() } });
+
+    return NextResponse.json({ success: true });
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  db.prepare("UPDATE orders SET status = ? WHERE id = ?").run(status, Number(id));
-  return NextResponse.json({ success: true });
 }

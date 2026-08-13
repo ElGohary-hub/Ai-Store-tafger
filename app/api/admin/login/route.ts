@@ -10,12 +10,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Email and password are required." }, { status: 400 });
   }
 
-  const user = getAdminByEmail(email);
+  const user = await getAdminByEmail(email);
   if (!user || !verifyPassword(password, user.password)) {
     return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
   }
 
-  const session = createSession(user.id);
+  const session = await createSession(user._id);
   const response = NextResponse.json({ success: true, token: session.token, expiresAt: session.expiresAt });
   response.cookies.set("cms_token", session.token, {
     httpOnly: true,

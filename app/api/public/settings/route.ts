@@ -1,11 +1,16 @@
 import { NextResponse } from "next/server";
-import db from "@/lib/db";
+import { getDb } from "@/lib/mongodb";
 
 export async function GET() {
-  const rows = db.prepare("SELECT key, value FROM settings").all();
-  const settings: Record<string, string> = {};
-  rows.forEach((row: { key: string; value: string }) => {
-    settings[row.key] = row.value;
-  });
-  return NextResponse.json(settings);
+  try {
+    const db = await getDb();
+    const rows = await db.collection("settings").find({}).toArray();
+    const settings: Record<string, string> = {};
+    rows.forEach((row) => {
+      settings[row.key] = row.value;
+    });
+    return NextResponse.json(settings);
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 }

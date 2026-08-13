@@ -1,27 +1,57 @@
 import { createToken } from "./security";
-import db from "./db";
+import { getDb } from "./mongodb";
+import { cookies } from "next/headers";
+import { NextRequest } from "next/server";
+import { ObjectId } from "mongodb";
 
-export function createSession(adminId: number) {
+export async function createSession(adminId: string | ObjectId) {
+  const db = await getDb();
   const token = createToken();
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-  db.prepare("INSERT INTO sessions (admin_id, token, expires_at) VALUES (?, ?, ?)").run(adminId, token, expiresAt);
-  return { token, expiresAt };
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  await db.collection("sessions").insertOne({
+    adminId: adminId.toString(),
+    token,
+    expiresAt,
+    createdAt: new Date(),
+  });
+  return { token, expiresAt: expiresAt.toISOString() };
 }
 
-export function getSession(token: string | undefined) {
+export async function getSession(token: string | undefined) {
   if (!token) return null;
-  return db
-    .prepare("SELECT * FROM sessions WHERE token = ? AND expires_at > datetime('now')")
-    .get(token);
+  const db = await getDb();
+  return await db.collection("sessions").findOne({
+    token,
+    expiresAt: { $gt: new Date() },
+  });
 }
 
-export function getAdminBySessionToken(token: string | undefined) {
-  const session = getSession(token);
+export async function getAdminBySessionToken(token: string | undefined) {
+  const session = await getSession(token);
   if (!session) return null;
-  return db.prepare("SELECT id, email, role FROM admins WHERE id = ?").get(session.admin_id);
+  const db = await getDb();
+  try {
+    return await db.collection("admins").findOne(
+      { _id: new ObjectId(session.adminId) },
+      { projection: { password: 0 } }
+    );
+  } catch {
+    return null;
+  }
 }
 
-export function revokeSession(token: string | undefined) {
+export async function getAuthAdmin(req?: NextRequest) {
+  let token = req?.cookies?.get?.("cms_token")?.value;
+  if (!token) {
+    try {
+      token = (await cookies()).get("cms_token")?.value;
+    } catch {}
+  }
+  return await getAdminBySessionToken(token);
+}
+
+export async function revokeSession(token: string | undefined) {
   if (!token) return null;
-  return db.prepare("DELETE FROM sessions WHERE token = ?").run(token);
+  const db = await getDb();
+  return await db.collection("sessions").deleteOne({ token });
 }

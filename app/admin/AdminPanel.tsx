@@ -8,7 +8,7 @@ type AdminInfo = {
 };
 
 type Product = {
-  id: number;
+  id: string | number;
   sku: string;
   name: string;
   description: string;
@@ -21,7 +21,7 @@ type Product = {
   is_new: number;
   visible: number;
   stock: number;
-  category_id: number | null;
+  category_id: string | number | null;
   image: string;
   sort_order: number;
   tags: string;
@@ -29,7 +29,7 @@ type Product = {
 };
 
 type Category = {
-  id: number;
+  id: string | number;
   name: string;
   slug: string;
   image: string;
@@ -38,14 +38,14 @@ type Category = {
 };
 
 type MediaItem = {
-  id: number;
+  id: string | number;
   url: string;
   filename: string;
   type: string;
 };
 
 type Order = {
-  id: number;
+  id: string | number;
   customer_name: string;
   customer_email: string;
   customer_phone: string;
@@ -55,13 +55,29 @@ type Order = {
 };
 
 type Customer = {
-  id: number;
+  id: string | number;
   name: string;
   email: string;
   phone: string;
   orders_count: number;
   total_spent: number;
   last_order_at: string;
+};
+
+type CryptoPayment = {
+  id: string | number;
+  order_id: string;
+  customer_name: string;
+  customer_phone: string;
+  product_name: string;
+  amount: number;
+  currency: string;
+  network: string;
+  tx_hash: string;
+  status: string;
+  binance_order_id: string;
+  created_at: string;
+  verified_at: string;
 };
 
 const sectionNames = [
@@ -71,6 +87,7 @@ const sectionNames = [
   "homepage",
   "media",
   "orders",
+  "crypto",
   "customers",
   "settings",
 ];
@@ -84,6 +101,7 @@ export default function AdminPanel({ admin }: { admin: AdminInfo }) {
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [cryptoPayments, setCryptoPayments] = useState<CryptoPayment[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showProductModal, setShowProductModal] = useState(false);
@@ -102,6 +120,7 @@ export default function AdminPanel({ admin }: { admin: AdminInfo }) {
     instagram_url: "",
     telegram_url: "",
     currency: "",
+    usdt_rate: "50",
     footer_text: "",
     seo_title: "",
     seo_description: "",
@@ -123,7 +142,7 @@ export default function AdminPanel({ admin }: { admin: AdminInfo }) {
     setLoading(true);
     setError("");
     try {
-      const [dashboardRes, productsRes, categoriesRes, settingsRes, mediaRes, ordersRes, customersRes] = await Promise.all([
+      const [dashboardRes, productsRes, categoriesRes, settingsRes, mediaRes, ordersRes, customersRes, cryptoRes] = await Promise.all([
         fetch("/api/admin/dashboard"),
         fetch("/api/admin/products"),
         fetch("/api/admin/categories"),
@@ -131,6 +150,7 @@ export default function AdminPanel({ admin }: { admin: AdminInfo }) {
         fetch("/api/admin/media"),
         fetch("/api/admin/orders"),
         fetch("/api/admin/customers"),
+        fetch("/api/admin/crypto-payments"),
       ]);
 
       if (!dashboardRes.ok || !productsRes.ok || !categoriesRes.ok || !settingsRes.ok || !mediaRes.ok || !ordersRes.ok || !customersRes.ok) {
@@ -145,6 +165,10 @@ export default function AdminPanel({ admin }: { admin: AdminInfo }) {
       setMedia(await mediaRes.json());
       setOrders(await ordersRes.json());
       setCustomers(await customersRes.json());
+      if (cryptoRes.ok) {
+        const cryptoData = await cryptoRes.json();
+        setCryptoPayments(cryptoData.payments || []);
+      }
 
       setSiteForm((prev) => ({
         ...prev,
@@ -217,7 +241,7 @@ export default function AdminPanel({ admin }: { admin: AdminInfo }) {
     }
   }
 
-  async function deleteProduct(productId: number) {
+  async function deleteProduct(productId: string | number) {
     if (!confirm("Are you sure you want to delete this product?")) return;
     await fetch("/api/admin/products", {
       method: "DELETE",
@@ -266,7 +290,7 @@ export default function AdminPanel({ admin }: { admin: AdminInfo }) {
     refreshAll();
   }
 
-  async function deleteCategory(categoryId: number) {
+  async function deleteCategory(categoryId: string | number) {
     if (!confirm("Delete this category?")) return;
     await fetch("/api/admin/categories", {
       method: "DELETE",
@@ -307,13 +331,41 @@ export default function AdminPanel({ admin }: { admin: AdminInfo }) {
     refreshAll();
   }
 
-  async function updateOrderStatus(orderId: number, status: string) {
+  async function updateOrderStatus(orderId: string | number, status: string) {
     await fetch("/api/admin/orders", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: orderId, status }),
     });
     refreshAll();
+  }
+
+  async function updateCryptoStatus(paymentId: string | number, status: string) {
+    await fetch("/api/admin/crypto-payments", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: paymentId, status }),
+    });
+    refreshAll();
+  }
+
+  async function verifyCryptoPaymentAdmin(orderId: string, txHash?: string) {
+    try {
+      const res = await fetch("/api/public/crypto/verify-payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId, txHash }),
+      });
+      const data = await res.json();
+      if (data.verified) {
+        alert("✓ تم التحقق بنجاح وتأكيد الدفع من بينانس!");
+      } else {
+        alert(data.message || "لم يتم العثور على إيداع مطابق في بينانس حتى الآن.");
+      }
+      refreshAll();
+    } catch (err: any) {
+      alert("خطأ أثناء التحقق: " + err.message);
+    }
   }
 
   async function saveSettings(event: React.FormEvent) {
@@ -644,6 +696,89 @@ export default function AdminPanel({ admin }: { admin: AdminInfo }) {
               </div>
             )}
 
+            {activeSection === "crypto" && (
+              <div className="space-y-6">
+                <div className="rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-lg shadow-black/10">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <h2 className="text-2xl font-semibold text-white flex items-center gap-2">
+                        <span>مدفوعات الكريبتو / Binance Pay</span>
+                        <span className="rounded-full bg-amber-500/20 text-amber-300 text-xs px-3 py-1 font-mono">Live API</span>
+                      </h2>
+                      <p className="mt-1 text-sm text-slate-400">متابعة طلبات الدفع عبر USDT والتحقق التلقائي واليدوي من منصة بينانس.</p>
+                    </div>
+                    <button onClick={refreshAll} className="rounded-2xl bg-amber-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-amber-400">
+                      تحديث المدفوعات
+                    </button>
+                  </div>
+                </div>
+
+                <div className="overflow-hidden rounded-3xl border border-slate-800 bg-slate-900 shadow-lg">
+                  <div className="grid grid-cols-[1.5fr_1.2fr_1fr_1.2fr_1fr_1.2fr] gap-px bg-slate-800 px-4 py-3 text-xs uppercase tracking-[0.12em] text-slate-400 text-right" dir="rtl">
+                    <span>رقم الطلب / العميل</span>
+                    <span>المنتج</span>
+                    <span>المبلغ / الشبكة</span>
+                    <span>معرف المعاملة (TxID)</span>
+                    <span>الحالة</span>
+                    <span className="text-left">إجراءات</span>
+                  </div>
+                  <div className="divide-y divide-slate-800">
+                    {cryptoPayments.map((p) => (
+                      <div key={p.id} className="grid grid-cols-[1.5fr_1.2fr_1fr_1.2fr_1fr_1.2fr] items-center gap-px bg-slate-950 px-4 py-4 text-sm text-slate-300 text-right" dir="rtl">
+                        <div>
+                          <p className="font-semibold text-white font-mono text-xs">{p.order_id}</p>
+                          <p className="text-xs text-slate-400">{p.customer_name} {p.customer_phone ? `(${p.customer_phone})` : ""}</p>
+                          <p className="text-[10px] text-slate-500 mt-0.5">{new Date(p.created_at).toLocaleString()}</p>
+                        </div>
+                        <div className="text-xs font-medium text-amber-200 truncate">{p.product_name || "منتج AI"}</div>
+                        <div>
+                          <span className="font-bold text-white font-mono">{p.amount} {p.currency}</span>
+                          <span className="block text-[11px] text-slate-500">{p.network}</span>
+                        </div>
+                        <div className="truncate font-mono text-xs text-slate-400">
+                          {p.tx_hash ? (
+                            <span className="truncate block title={p.tx_hash}">{p.tx_hash.slice(0, 10)}...{p.tx_hash.slice(-6)}</span>
+                          ) : (
+                            <span className="text-slate-600">—</span>
+                          )}
+                        </div>
+                        <div>
+                          <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${
+                            p.status === "completed" || p.status === "paid"
+                              ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                              : p.status === "pending"
+                              ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                              : "bg-rose-500/20 text-rose-400 border border-rose-500/30"
+                          }`}>
+                            {p.status === "completed" || p.status === "paid" ? "✓ مؤكد ومستلم" : p.status === "pending" ? "قيد الانتظار" : p.status}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 justify-end" dir="ltr">
+                          <button
+                            onClick={() => verifyCryptoPaymentAdmin(p.order_id, p.tx_hash)}
+                            title="التحقق المباشر من بينانس"
+                            className="rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 hover:bg-amber-500/30 px-3 py-1.5 text-xs font-bold transition"
+                          >
+                            ⚡ فحص بينانس
+                          </button>
+                          <select
+                            value={p.status}
+                            onChange={(e) => updateCryptoStatus(p.id, e.target.value)}
+                            className="rounded-xl bg-slate-900 border border-slate-700 px-2 py-1 text-xs text-slate-300 outline-none"
+                          >
+                            <option value="pending">pending</option>
+                            <option value="completed">completed</option>
+                            <option value="cancelled">cancelled</option>
+                          </select>
+                        </div>
+                      </div>
+                    ))}
+                    {!cryptoPayments.length && <div className="p-6 text-center text-slate-500">لا توجد مدفوعات كريبتو حتى الآن.</div>}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {activeSection === "customers" && (
               <div className="space-y-6">
                 <div className="rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-lg shadow-black/10">
@@ -697,6 +832,7 @@ export default function AdminPanel({ admin }: { admin: AdminInfo }) {
                       { label: "Instagram URL", key: "instagram_url" },
                       { label: "Telegram URL", key: "telegram_url" },
                       { label: "Currency label", key: "currency" },
+                      { label: "USDT Exchange Rate (سعر صرف 1 دولار USDT بالعملة)", key: "usdt_rate" },
                       { label: "Footer text", key: "footer_text", area: true },
                       { label: "SEO title", key: "seo_title" },
                       { label: "SEO description", key: "seo_description", area: true },
@@ -757,7 +893,7 @@ export default function AdminPanel({ admin }: { admin: AdminInfo }) {
             <div className="mt-4 grid gap-4 lg:grid-cols-2">
               <div className="space-y-3 rounded-3xl border border-slate-800 bg-slate-900 p-4">
                 <p className="text-sm text-slate-400">Category</p>
-                <select value={productForm.category_id ?? ""} onChange={(event) => setProductForm({ ...productForm, category_id: event.target.value ? Number(event.target.value) : null })} className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none focus:border-amber-500">
+                <select value={productForm.category_id ?? ""} onChange={(event) => setProductForm({ ...productForm, category_id: event.target.value || null })} className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none focus:border-amber-500">
                   <option value="">Uncategorized</option>
                   {categories.map((category) => (
                     <option key={category.id} value={category.id}>{category.name}</option>

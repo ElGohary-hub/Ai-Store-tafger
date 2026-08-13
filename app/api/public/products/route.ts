@@ -1,9 +1,39 @@
 import { NextResponse } from "next/server";
-import db from "@/lib/db";
+import { getDb } from "@/lib/mongodb";
 
 export async function GET() {
-  const products = db
-    .prepare(`SELECT p.id, p.sku, p.name, p.description, p.price, p.original_price, p.discount_enabled, p.discount_percentage, p.featured, p.best_seller, p.is_new, p.visible, p.stock, p.category_id, p.image, p.sort_order, p.tags, c.name as category_name, c.slug as category_slug FROM products p LEFT JOIN categories c ON p.category_id = c.id WHERE p.visible = 1 ORDER BY p.sort_order ASC, p.id ASC`)
-    .all();
-  return NextResponse.json(products);
+  try {
+    const db = await getDb();
+    const rawProducts = await db
+      .collection("products")
+      .find({ visible: { $ne: 0 } })
+      .sort({ sort_order: 1, _id: 1 })
+      .toArray();
+
+    const products = rawProducts.map((p) => ({
+      id: p.sku || p._id.toString(),
+      _id: p._id.toString(),
+      sku: p.sku || p._id.toString(),
+      name: p.name,
+      description: p.description || "",
+      detail: p.description || "",
+      price: p.price,
+      original_price: p.original_price,
+      discount_enabled: p.discount_enabled,
+      discount_percentage: p.discount_percentage,
+      featured: p.featured,
+      best_seller: p.best_seller,
+      is_new: p.is_new,
+      visible: p.visible,
+      stock: p.stock,
+      category_id: p.category_id,
+      image: p.image,
+      sort_order: p.sort_order,
+      tags: p.tags,
+    }));
+
+    return NextResponse.json(products);
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 }

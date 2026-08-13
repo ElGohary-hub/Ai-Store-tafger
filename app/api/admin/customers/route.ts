@@ -1,22 +1,44 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminBySessionToken } from "@/lib/auth";
-import db from "@/lib/db";
+import { getAuthAdmin } from "@/lib/auth";
+import { getDb } from "@/lib/mongodb";
 
-function requireAdmin(req: NextRequest) {
-  const token = req.cookies.get("cms_token")?.value;
-  const admin = getAdminBySessionToken(token);
+async function requireAdmin(req: NextRequest) {
+  const admin = await getAuthAdmin(req);
   if (!admin) throw new Error("Unauthorized");
   return admin;
 }
 
 export async function GET(req: NextRequest) {
-  requireAdmin(req);
-  const search = req.nextUrl.searchParams.get("search")?.trim();
-  let customers = [];
-  if (search) {
-    customers = db.prepare("SELECT * FROM customers WHERE name LIKE ? OR email LIKE ? OR phone LIKE ? ORDER BY last_order_at DESC").all(`%${search}%`, `%${search}%`, `%${search}%`);
-  } else {
-    customers = db.prepare("SELECT * FROM customers ORDER BY last_order_at DESC").all();
+  try {
+    await requireAdmin(req);
+    const search = req.nextUrl.searchParams.get("search")?.trim();
+    const db = await getDb();
+
+    let query: any = {};
+    if (search) {
+      query = {
+        $or: [
+          { name: { $regex: search, $options: "i" } },
+          { email: { $regex: search, $options: "i" } },
+          { phone: { $regex: search, $options: "i" } },
+        ],
+      };
+    }
+
+    const customers = await db.collection("customers").find(query).sort({ last_order_at: -1 }).toArray();
+
+    return NextResponse.json(
+      customers.map((c) => ({
+        id: c._id.toString(),
+        name: c.name || "Anonymous",
+        email: c.email || "",
+        phone: c.phone || "",
+        orders_count: c.orders_count || 0,
+        total_spent: c.total_spent || 0,
+        last_order_at: c.last_order_at || "",
+      }))
+    );
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  return NextResponse.json(customers);
 }

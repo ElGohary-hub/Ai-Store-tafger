@@ -1,48 +1,107 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminBySessionToken } from "@/lib/auth";
-import db from "@/lib/db";
+import { getAuthAdmin } from "@/lib/auth";
+import { getDb } from "@/lib/mongodb";
+import { ObjectId } from "mongodb";
 
-function requireAdmin(req: NextRequest) {
-  const token = req.cookies.get("cms_token")?.value;
-  const admin = getAdminBySessionToken(token);
+async function requireAdmin(req: NextRequest) {
+  const admin = await getAuthAdmin(req);
   if (!admin) throw new Error("Unauthorized");
   return admin;
 }
 
 export async function GET(req: NextRequest) {
-  requireAdmin(req);
-  const sections = db.prepare("SELECT * FROM homepage_sections ORDER BY sort_order ASC").all();
-  return NextResponse.json(sections);
+  try {
+    await requireAdmin(req);
+    const db = await getDb();
+    const sections = await db.collection("homepage_sections").find({}).sort({ sort_order: 1 }).toArray();
+    return NextResponse.json(
+      sections.map((s) => ({
+        id: s._id.toString(),
+        section_key: s.section_key,
+        title: s.title || "",
+        description: s.description || "",
+        button_text: s.button_text || "",
+        button_url: s.button_url || "",
+        image: s.image || "",
+        visible: s.visible,
+        sort_order: s.sort_order,
+        metadata: s.metadata || "",
+      }))
+    );
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 }
 
 export async function POST(req: NextRequest) {
-  requireAdmin(req);
-  const body = await req.json();
-  const { section_key, title, description, button_text, button_url, image, visible, sort_order, metadata } = body;
-  if (!section_key) {
-    return NextResponse.json({ error: "Section key is required." }, { status: 400 });
+  try {
+    await requireAdmin(req);
+    const body = await req.json();
+    const { section_key, title, description, button_text, button_url, image, visible, sort_order, metadata } = body;
+    if (!section_key) {
+      return NextResponse.json({ error: "Section key is required." }, { status: 400 });
+    }
+    const db = await getDb();
+    await db.collection("homepage_sections").insertOne({
+      section_key,
+      title: title || "",
+      description: description || "",
+      button_text: button_text || "",
+      button_url: button_url || "",
+      image: image || "",
+      visible: visible !== undefined ? (visible ? 1 : 0) : 1,
+      sort_order: Number(sort_order) || 0,
+      metadata: metadata || "",
+      createdAt: new Date(),
+    });
+    return NextResponse.json({ success: true });
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  db.prepare("INSERT INTO homepage_sections (section_key, title, description, button_text, button_url, image, visible, sort_order, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").run(section_key, title || "", description || "", button_text || "", button_url || "", image || "", visible ? 1 : 0, Number(sort_order) || 0, metadata || "");
-  return NextResponse.json({ success: true });
 }
 
 export async function PUT(req: NextRequest) {
-  requireAdmin(req);
-  const body = await req.json();
-  const { id, title, description, button_text, button_url, image, visible, sort_order, metadata } = body;
-  if (!id) {
-    return NextResponse.json({ error: "ID is required." }, { status: 400 });
+  try {
+    await requireAdmin(req);
+    const body = await req.json();
+    const { id, title, description, button_text, button_url, image, visible, sort_order, metadata } = body;
+    if (!id) {
+      return NextResponse.json({ error: "ID is required." }, { status: 400 });
+    }
+    const db = await getDb();
+    const query = ObjectId.isValid(id) ? { _id: new ObjectId(id) } : { section_key: id };
+    await db.collection("homepage_sections").updateOne(query, {
+      $set: {
+        title: title || "",
+        description: description || "",
+        button_text: button_text || "",
+        button_url: button_url || "",
+        image: image || "",
+        visible: visible !== undefined ? (visible ? 1 : 0) : 1,
+        sort_order: Number(sort_order) || 0,
+        metadata: metadata || "",
+        updatedAt: new Date(),
+      },
+    });
+    return NextResponse.json({ success: true });
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  db.prepare("UPDATE homepage_sections SET title = ?, description = ?, button_text = ?, button_url = ?, image = ?, visible = ?, sort_order = ?, metadata = ? WHERE id = ?").run(title || "", description || "", button_text || "", button_url || "", image || "", visible ? 1 : 0, Number(sort_order) || 0, metadata || "", Number(id));
-  return NextResponse.json({ success: true });
 }
 
 export async function DELETE(req: NextRequest) {
-  requireAdmin(req);
-  const { id } = await req.json();
-  if (!id) {
-    return NextResponse.json({ error: "ID is required." }, { status: 400 });
+  try {
+    await requireAdmin(req);
+    const body = await req.json();
+    const { id } = body;
+    if (!id) {
+      return NextResponse.json({ error: "ID is required." }, { status: 400 });
+    }
+    const db = await getDb();
+    const query = ObjectId.isValid(id) ? { _id: new ObjectId(id) } : { section_key: id };
+    await db.collection("homepage_sections").deleteOne(query);
+    return NextResponse.json({ success: true });
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  db.prepare("DELETE FROM homepage_sections WHERE id = ?").run(Number(id));
-  return NextResponse.json({ success: true });
 }

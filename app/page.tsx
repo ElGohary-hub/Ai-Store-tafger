@@ -24,6 +24,7 @@ type Product = {
 };
 
 type SettingsState = {
+  website_name?: string;
   hero_title: string;
   hero_description: string;
   hero_image: string;
@@ -33,9 +34,11 @@ type SettingsState = {
   contact_phone: string;
   contact_email: string;
   currency: string;
+  usdt_rate?: string;
 };
 
 const INITIAL_SETTINGS: SettingsState = {
+  website_name: "AI STORE",
   hero_title: "اختر الباقة المناسبة لك",
   hero_description: "اشتراكات مدعومة بتفعيل احترافي وخدمة عملاء سريعة.",
   hero_image: "/p3.png",
@@ -45,6 +48,7 @@ const INITIAL_SETTINGS: SettingsState = {
   contact_phone: "01158413075",
   contact_email: "info@aistore.com",
   currency: "ج.م",
+  usdt_rate: "50",
 };
 
 const DEFAULT_PRODUCTS: Product[] = [
@@ -66,13 +70,15 @@ const DEFAULT_PRODUCTS: Product[] = [
   { id: "figma", name: "Figma", detail: "حسب الباقة، تواصل معي للتفاصيل", price: 70, image: "/p9.png" },
 ];
 
-function formatPrice(p: number | string) {
+function formatPrice(p: number | string, currency = "ج.م", usdtRate = 50) {
   if (typeof p === "number") {
+    const rate = usdtRate > 0 ? usdtRate : 50;
+    const usdVal = (p / rate).toFixed(2).replace(/\.00$/, "").replace(/(\.[1-9])0$/, "$1");
     return (
       <span className="flex items-center justify-center gap-1.5" dir="rtl">
-        <span>{p} ج.م</span>
+        <span>{p} {currency}</span>
         <span className="text-white/40 font-medium">/</span>
-        <span dir="ltr">2$</span>
+        <span dir="ltr">{usdVal}$</span>
       </span>
     );
   }
@@ -135,10 +141,11 @@ export default function Home() {
   [cart, products]);
 
   const binanceUsdAmount = useMemo(() => {
-    if (isCheckoutFromCart) return cartCount * 2;
-    if (selectedProductForBuy) return 2;
-    return 0;
-  }, [isCheckoutFromCart, cartCount, selectedProductForBuy]);
+    const rate = Number(settings.usdt_rate) > 0 ? Number(settings.usdt_rate) : 50;
+    const totalLocal = isCheckoutFromCart ? cartTotal : (selectedProductForBuy ? Number(selectedProductForBuy.price || 0) : 0);
+    const converted = totalLocal / rate;
+    return Math.max(0.01, Number(converted.toFixed(2)));
+  }, [isCheckoutFromCart, cartTotal, selectedProductForBuy, settings.usdt_rate]);
 
   function addToCart(id: string) { setCart((c) => ({ ...c, [id]: (c[id] ?? 0) + 1 })); }
   function decreaseQuantity(id: string) { setCart((c) => { const qty = c[id]; if (!qty) return c; if (qty === 1) { const newCart = { ...c }; delete newCart[id]; return newCart; } return { ...c, [id]: qty - 1 }; }); }
@@ -197,34 +204,114 @@ export default function Home() {
     setIsPaymentModalOpen(false);
   }
 
-  function payViaBinance() { setIsPaymentModalOpen(false); setIsBinanceModalOpen(true); }
-  function openVodafoneModal() { setIsPaymentModalOpen(false); setIsVodafoneModalOpen(true); }
-  
+  const [cryptoAddresses, setCryptoAddresses] = useState<Array<{ networkId: string; networkName: string; address: string; tag: string; isPopular?: boolean }>>([]);
+  const [selectedNetwork, setSelectedNetwork] = useState<string>("TRX");
+  const [currentCryptoOrder, setCurrentCryptoOrder] = useState<any>(null);
+  const [verificationError, setVerificationError] = useState("");
+  const [copiedAddress, setCopiedAddress] = useState(false);
+
+  useEffect(() => {
+    async function fetchCryptoAddresses() {
+      try {
+        const res = await fetch("/api/public/crypto/addresses");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.addresses && data.addresses.length > 0) {
+            setCryptoAddresses(data.addresses);
+            setSelectedNetwork(data.addresses[0].networkId);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load crypto addresses", err);
+      }
+    }
+    fetchCryptoAddresses();
+  }, []);
+
+  const activeCryptoAddress = useMemo(() => {
+    return cryptoAddresses.find(a => a.networkId === selectedNetwork)?.address || "TN9kZMYS53JbuHQbsGPGDvJXD4gUhPVZi7";
+  }, [cryptoAddresses, selectedNetwork]);
+
+  function openVodafoneModal() {
+    setIsPaymentModalOpen(false);
+    setIsVodafoneModalOpen(true);
+  }
+
+  async function payViaBinance() {
+    setIsPaymentModalOpen(false);
+    setIsBinanceModalOpen(true);
+    setVerificationResult(null);
+    setVerificationError("");
+
+    // Create a pending crypto order in backend
+    try {
+      const productName = isCheckoutFromCart
+        ? `سلة مشتريات (${cartCount} منتجات)`
+        : (selectedProductForBuy?.name || "اشتراك AI");
+      const prodId = isCheckoutFromCart ? "cart" : (selectedProductForBuy?.id || "product");
+
+      const res = await fetch("/api/public/crypto/create-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerName: "عميل المتجر",
+          customerPhone: senderPhone || "",
+          productId: prodId,
+          productName,
+          amount: binanceUsdAmount,
+          currency: "USDT",
+          network: selectedNetwork,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setCurrentCryptoOrder(data);
+      }
+    } catch (err) {
+      console.error("Error creating crypto order:", err);
+    }
+  }
+
   const myBinancePayId = "1082962624";
   function copyBinanceId() { navigator.clipboard.writeText(myBinancePayId); setCopied(true); setTimeout(() => setCopied(false), 2500); }
+  function copyWalletAddress() { navigator.clipboard.writeText(activeCryptoAddress); setCopiedAddress(true); setTimeout(() => setCopiedAddress(false), 2500); }
 
-  function verifyBinancePayment() {
-    if (!txIdInput.trim()) { alert("برجاء إدخال رقم المعاملة (TxID)!"); return; }
+  async function verifyBinancePayment() {
     setIsVerifying(true);
-    setTimeout(() => { 
-      setIsVerifying(false); 
-      setVerificationResult("success");
-      
-      let confirmationText = `السلام عليكم ورحمة الله وبركاتة\nلقد قمت بالدفع عبر Binance Pay بقيمة ${binanceUsdAmount}$\nالمنتج:`;
-      
-      if (isCheckoutFromCart) {
-        confirmationText += "\n";
-        Object.entries(cart).forEach(([id, qty]) => {
-            const p = products.find(x => x.id === id);
-            if (p) confirmationText += `- ${p.name} x${qty}\n`;
-        });
-        confirmationText += `رقم المعاملة :${txIdInput}`;
-      } else if (selectedProductForBuy) {
-        confirmationText += `${selectedProductForBuy.name}\nرقم المعاملة :${txIdInput}`;
-      }
+    setVerificationError("");
+    setVerificationResult(null);
 
-      window.open(`${settings.contact_whatsapp || "https://wa.me/201158413075?text="}${encodeURIComponent(confirmationText)}`, "_blank");
-    }, 2000);
+    const orderId = currentCryptoOrder?.orderId;
+    if (!orderId) {
+      // Create order first if not yet created
+      setVerificationError("يرجى إعادة المحاولة");
+      setIsVerifying(false);
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/public/crypto/verify-payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId,
+          txHash: txIdInput.trim() || undefined,
+        }),
+      });
+
+      const data = await res.json();
+      setIsVerifying(false);
+
+      if (data.verified) {
+        setVerificationResult("success");
+      } else {
+        setVerificationError(data.message || "لم يتم تأكيد التحويل بعد. قد يستغرق تأكيد الشبكة 1-2 دقيقة.");
+      }
+    } catch (err) {
+      setIsVerifying(false);
+      setVerificationError("حدث خطأ أثناء الاتصال بمنصة بينانس. يرجى المحاولة بعد لحظات.");
+    }
   }
 
   const floatingButtonStyle = {
@@ -263,7 +350,7 @@ export default function Home() {
               <div className="flex flex-col items-center text-center gap-2 p-6 pb-3">
                 <h2 className="font-display text-2xl font-bold text-white drop-shadow-md">{p.name}</h2>
                 <div className="font-display text-xl font-extrabold text-[#E8A33D] drop-shadow-[0_2px_8px_rgba(232,163,61,0.4)]">
-                  {formatPrice(p.price)}
+                  {formatPrice(p.price, settings.currency, Number(settings.usdt_rate))}
                 </div>
                 <p className="mt-1 text-sm text-white/70 line-clamp-3 leading-relaxed">{p.detail}</p>
               </div>
@@ -308,10 +395,8 @@ export default function Home() {
                             <img src={p.image} alt={p.name} className="w-12 h-12 object-contain bg-black/60 rounded-xl p-1 border border-white/10" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                             <div>
                               <h4 className="text-white font-bold text-base">{p.name}</h4>
-                              <div className="text-[#E8A33D] text-xs font-semibold mt-1 flex items-center justify-start gap-1" dir="rtl">
-                                <span>{p.price} ج.م</span>
-                                <span className="text-white/40">/</span>
-                                <span dir="ltr">2$</span>
+                              <div className="text-[#E8A33D] text-xs font-semibold mt-1">
+                                {formatPrice(p.price, settings.currency, Number(settings.usdt_rate))}
                               </div>
                             </div>
                           </div>
@@ -323,10 +408,8 @@ export default function Home() {
                             <span className="w-10 text-center text-white font-extrabold">{qty}</span>
                             <button onClick={() => addToCart(id)} className="w-9 h-9 text-white font-bold hover:text-[#E8A33D] transition">+</button>
                           </div>
-                          <div className="text-[#E8A33D] font-extrabold text-sm flex items-center justify-end gap-1" dir="rtl">
-                             <span>{typeof p.price === 'number' ? p.price * qty : 0} ج.م</span>
-                             <span className="text-white/40">/</span>
-                             <span dir="ltr">{2 * qty}$</span>
+                          <div className="text-[#E8A33D] font-extrabold text-sm">
+                             {formatPrice(typeof p.price === 'number' ? p.price * qty : 0, settings.currency, Number(settings.usdt_rate))}
                           </div>
                         </div>
                       </div>
@@ -341,10 +424,8 @@ export default function Home() {
                 <div className="flex justify-between items-center mb-5">
                   <span className="font-bold text-xl text-white">الإجمالي الكلي:</span>
                   <div className="text-right flex flex-col items-end">
-                    <span className="font-extrabold text-2xl text-[#E8A33D] drop-shadow flex items-center gap-1.5" dir="rtl">
-                      <span>{cartTotal} ج.م</span>
-                      <span className="text-white/40 font-medium">/</span>
-                      <span dir="ltr">{cartCount * 2}$</span>
+                    <span className="font-extrabold text-2xl text-[#E8A33D] drop-shadow">
+                      {formatPrice(cartTotal, settings.currency, Number(settings.usdt_rate))}
                     </span>
                   </div>
                 </div>
@@ -456,80 +537,188 @@ export default function Home() {
         </div>
       )}
 
-      {/* نافذة بينانس */}
+      {/* نافذة بينانس / USDT مع التحقق التلقائي */}
       {isBinanceModalOpen && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
-          <div className="bg-gradient-to-b from-[#1b2131] to-[#11141e] border-2 border-[#E8A33D]/50 rounded-3xl w-full max-w-md p-8 shadow-[0_30px_60px_rgba(0,0,0,0.95)] flex flex-col gap-5 text-center relative overflow-hidden">
+          <div className="bg-gradient-to-b from-[#1b2131] to-[#11141e] border-2 border-[#E8A33D]/50 rounded-3xl w-full max-w-md p-6 sm:p-8 shadow-[0_30px_60px_rgba(0,0,0,0.95)] flex flex-col gap-4 text-center relative overflow-hidden max-h-[92vh] overflow-y-auto">
             
             {isVerifying ? (
               <div className="py-16 flex flex-col items-center justify-center gap-4">
                 <div className="w-16 h-16 border-4 border-[#E8A33D] border-t-transparent rounded-full animate-spin"></div>
-                <p className="text-white font-bold text-lg">جاري إرسال رقم المعاملة للمراجعة...</p>
-                <p className="text-white/50 text-xs">سيتم تحويلك للواتساب لتأكيد وصول المبلغ لحسابك</p>
+                <p className="text-white font-bold text-lg">جاري التحقق من شبكة بينانس لحظياً...</p>
+                <p className="text-white/50 text-xs">نتحقق من وصول إيداع مطابق في محفظتك على بينانس</p>
               </div>
             ) : verificationResult === "success" ? (
-              <div className="py-10 flex flex-col items-center justify-center gap-4">
-                <div className="w-16 h-16 bg-emerald-500/20 border border-emerald-500 text-emerald-400 rounded-full flex items-center justify-center text-3xl font-bold">✓</div>
-                <h3 className="text-2xl font-bold text-emerald-400">تم إرسال الطلب بنجاح!</h3>
-                <p className="text-white/70 text-sm">تم إرسال رقم المعاملة عبر الواتساب للمراجعة اليدوية وتأكيد وصول المبلغ في حسابك.</p>
+              <div className="py-8 flex flex-col items-center justify-center gap-4">
+                <div className="w-16 h-16 bg-emerald-500/20 border border-emerald-500 text-emerald-400 rounded-full flex items-center justify-center text-3xl font-bold shadow-[0_0_20px_rgba(16,185,129,0.4)]">✓</div>
+                <h3 className="text-2xl font-black text-emerald-400">تم تأكيد الدفع بنجاح!</h3>
+                <div className="bg-black/60 border border-emerald-500/30 rounded-2xl p-4 w-full text-right text-xs space-y-2">
+                  <div className="flex justify-between text-white/70">
+                    <span>رقم الطلب:</span>
+                    <span className="font-mono text-emerald-400">{currentCryptoOrder?.orderId || "CRYPTO-PAID"}</span>
+                  </div>
+                  <div className="flex justify-between text-white/70">
+                    <span>المبلغ المستلم:</span>
+                    <span className="font-bold text-white">{binanceUsdAmount} USDT</span>
+                  </div>
+                  <div className="flex justify-between text-white/70">
+                    <span>الحالة:</span>
+                    <span className="text-emerald-400 font-bold">مكتمل وموثق في بينانس ✓</span>
+                  </div>
+                </div>
+                <p className="text-white/70 text-xs">تم تسجيل طلبك وتوثيق الدفع في النظام بنجاح. سيتم تفعيل حسابك مباشرة!</p>
+                
+                <a
+                  href={`${settings.contact_whatsapp || "https://wa.me/201158413075?text="}${encodeURIComponent(`السلام عليكم، تم الدفع بنجاح عبر بينانس بقيمة ${binanceUsdAmount} USDT\nرقم الطلب: ${currentCryptoOrder?.orderId || ""}`)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 transition flex items-center justify-center gap-2 shadow-lg"
+                >
+                  <span>مراسلة الدعم وتفعيل الحساب</span>
+                </a>
+
                 <button 
                   onClick={() => setIsBinanceModalOpen(false)}
-                  className="mt-4 w-full rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 transition"
+                  className="w-full rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold py-2.5 transition text-xs"
                 >
-                  إغلاق
+                  إلغاء النافذة
                 </button>
               </div>
             ) : (
               <>
                 <div className="flex justify-center">
                   <span className="bg-[#E8A33D]/15 text-[#E8A33D] border border-[#E8A33D]/30 text-xs font-bold px-4 py-1.5 rounded-full uppercase tracking-widest shadow-sm">
-                    BINANCE PAY
+                    BINANCE & CRYPTO PAY
                   </span>
                 </div>
                 
-                <h3 className="text-2xl font-extrabold text-white tracking-wide">إتمام الدفع الفوري</h3>
+                <h3 className="text-2xl font-extrabold text-white tracking-wide">الدفع الفوري بالكريبتو</h3>
                 
-                <div className="bg-black/50 border border-white/10 rounded-2xl py-3 px-4 shadow-inner">
-                  <span className="text-xs text-white/60 block mb-1">المبلغ المطلوب تحويله:</span>
-                  <span className="text-2xl font-black text-[#E8A33D] tracking-wide">USD {binanceUsdAmount}$</span>
-                </div>
-                
-                <p className="text-white/70 text-xs leading-relaxed">
-                  قم بنسخ الـ <strong className="text-white">Pay ID</strong> ثم أرسل المبلغ في بينانس، وأدخل رقم المعاملة (TxID) هنا للمراجعة والتأكيد:
-                </p>
-
-                <div className="bg-black/70 border border-white/15 rounded-2xl p-3 flex items-center justify-between shadow-inner">
-                  <span className="font-mono text-lg font-bold tracking-wider text-[#E8A33D]">{myBinancePayId}</span>
-                  <button 
-                    onClick={copyBinanceId}
-                    className="bg-[#E8A33D] hover:bg-[#d69230] text-[#10131A] font-bold text-xs px-3 py-2 rounded-xl transition shadow active:scale-95"
-                  >
-                    {copied ? "تم النسخ! ✓" : "نسخ الـ ID"}
-                  </button>
+                <div className="bg-black/50 border border-white/10 rounded-2xl py-2.5 px-4 shadow-inner">
+                  <span className="text-xs text-white/60 block mb-0.5">المبلغ المطلوب تحويله:</span>
+                  <span className="text-2xl font-black text-[#E8A33D] tracking-wide">{binanceUsdAmount} USDT</span>
                 </div>
 
+                {/* اختيار الشبكة */}
                 <div className="flex flex-col gap-1.5 text-right">
-                  <label className="text-xs text-white/80 font-bold">أدخل رقم المعاملة (TxID) أو رقم الطلب:</label>
+                  <label className="text-xs text-white/80 font-bold">اختر شبكة التحويل:</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {cryptoAddresses.length > 0 ? (
+                      cryptoAddresses.map((net) => (
+                        <button
+                          key={net.networkId}
+                          type="button"
+                          onClick={() => setSelectedNetwork(net.networkId)}
+                          className={`py-2 px-1 rounded-xl text-[11px] font-bold transition border ${
+                            selectedNetwork === net.networkId
+                              ? "bg-[#E8A33D] text-[#10131A] border-[#E8A33D] shadow-md font-black"
+                              : "bg-black/50 text-white/80 border-white/10 hover:border-white/30"
+                          }`}
+                        >
+                          {net.networkId === "TRX" ? "USDT (TRC20)" : net.networkId === "BSC" ? "USDT (BEP20)" : net.networkId}
+                        </button>
+                      ))
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedNetwork("TRX")}
+                          className={`py-2 px-1 rounded-xl text-[11px] font-bold transition border ${
+                            selectedNetwork === "TRX" ? "bg-[#E8A33D] text-[#10131A] border-[#E8A33D]" : "bg-black/50 text-white/80 border-white/10"
+                          }`}
+                        >
+                          USDT (TRC20)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedNetwork("BSC")}
+                          className={`py-2 px-1 rounded-xl text-[11px] font-bold transition border ${
+                            selectedNetwork === "BSC" ? "bg-[#E8A33D] text-[#10131A] border-[#E8A33D]" : "bg-black/50 text-white/80 border-white/10"
+                          }`}
+                        >
+                          USDT (BEP20)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedNetwork("PAY_ID")}
+                          className={`py-2 px-1 rounded-xl text-[11px] font-bold transition border ${
+                            selectedNetwork === "PAY_ID" ? "bg-[#E8A33D] text-[#10131A] border-[#E8A33D]" : "bg-black/50 text-white/80 border-white/10"
+                          }`}
+                        >
+                          Binance Pay ID
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* عنوان المحفظة أو Pay ID مع QR Code */}
+                {selectedNetwork === "PAY_ID" ? (
+                  <div className="bg-black/70 border border-white/15 rounded-2xl p-3.5 flex items-center justify-between shadow-inner">
+                    <div className="text-right">
+                      <span className="text-[10px] text-white/50 block">Binance Pay ID:</span>
+                      <span className="font-mono text-base font-bold tracking-wider text-[#E8A33D]">{myBinancePayId}</span>
+                    </div>
+                    <button 
+                      onClick={copyBinanceId}
+                      className="bg-[#E8A33D] hover:bg-[#d69230] text-[#10131A] font-bold text-xs px-3.5 py-2 rounded-xl transition shadow active:scale-95"
+                    >
+                      {copied ? "تم النسخ! ✓" : "نسخ الـ ID"}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    <div className="bg-white rounded-2xl p-2 flex items-center justify-center mx-auto w-32 h-32 shadow-lg">
+                      <img 
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(activeCryptoAddress)}`}
+                        alt="USDT QR Code"
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                    <div className="bg-black/70 border border-white/15 rounded-2xl p-3 flex items-center justify-between shadow-inner gap-2">
+                      <div className="text-right truncate flex-1">
+                        <span className="text-[10px] text-white/50 block">عنوان المحفظة ({selectedNetwork === 'TRX' ? 'TRC20' : selectedNetwork === 'BSC' ? 'BEP20' : selectedNetwork}):</span>
+                        <span className="font-mono text-[11px] font-bold tracking-tight text-[#E8A33D] truncate block">{activeCryptoAddress}</span>
+                      </div>
+                      <button 
+                        onClick={copyWalletAddress}
+                        className="bg-[#E8A33D] hover:bg-[#d69230] text-[#10131A] font-bold text-xs px-3 py-2 rounded-xl transition shadow active:scale-95 shrink-0"
+                      >
+                        {copiedAddress ? "تم النسخ! ✓" : "نسخ العنوان"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* حقل TXID الاختياري للتسريع */}
+                <div className="flex flex-col gap-1 text-right">
+                  <label className="text-[11px] text-white/70">رقم المعاملة / TxID (اختياري لتسريع التحقق الفوري):</label>
                   <input 
                     type="text" 
                     value={txIdInput}
                     onChange={(e) => setTxIdInput(e.target.value)}
-                    placeholder="مثال: 44744682..." 
-                    className="w-full bg-black/60 border border-white/20 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-[#E8A33D] transition placeholder:text-white/30 text-center font-mono"
+                    placeholder="مثال: 0x94f3ef... أو معرّف التحويل" 
+                    className="w-full bg-black/60 border border-white/20 rounded-xl px-3 py-2.5 text-white text-xs focus:outline-none focus:border-[#E8A33D] transition placeholder:text-white/30 text-center font-mono"
                   />
                 </div>
 
-                <div className="flex flex-col gap-2.5 mt-1">
+                {verificationError && (
+                  <div className="bg-amber-500/10 border border-amber-500/30 text-amber-400 p-2.5 rounded-xl text-xs text-center leading-relaxed">
+                    {verificationError}
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-2 mt-1">
                   <button 
                     onClick={verifyBinancePayment}
-                    className="w-full rounded-2xl bg-gradient-to-r from-[#E8A33D] to-[#d69230] py-3.5 font-display text-sm font-extrabold text-[#10131A] transition-all hover:brightness-110 shadow-lg active:scale-95"
+                    className="w-full rounded-2xl bg-gradient-to-r from-[#E8A33D] to-[#d69230] py-3.5 font-display text-sm font-extrabold text-[#10131A] transition-all hover:brightness-110 shadow-lg active:scale-95 flex items-center justify-center gap-2"
                   >
-                    إرسال للمراجعة وتأكيد الطلب
+                    <span>⚡ تحقق من الدفع تلقائياً</span>
                   </button>
 
                   <button 
                     onClick={() => setIsBinanceModalOpen(false)}
-                    className="w-full rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold py-3 transition text-sm"
+                    className="w-full rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold py-2.5 transition text-xs"
                   >
                     إلغاء
                   </button>

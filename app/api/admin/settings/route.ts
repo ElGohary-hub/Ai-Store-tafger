@@ -1,33 +1,47 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminBySessionToken } from "@/lib/auth";
-import db from "@/lib/db";
+import { getAuthAdmin } from "@/lib/auth";
+import { getDb } from "@/lib/mongodb";
 
-function requireAdmin(req: NextRequest) {
-  const token = req.cookies.get("cms_token")?.value;
-  const admin = getAdminBySessionToken(token);
+async function requireAdmin(req: NextRequest) {
+  const admin = await getAuthAdmin(req);
   if (!admin) throw new Error("Unauthorized");
   return admin;
 }
 
 export async function GET(req: NextRequest) {
-  requireAdmin(req);
-  const rows = db.prepare("SELECT key, value FROM settings").all();
-  const settings: Record<string, string> = {};
-  rows.forEach((row: { key: string; value: string }) => {
-    settings[row.key] = row.value;
-  });
-  return NextResponse.json(settings);
+  try {
+    await requireAdmin(req);
+    const db = await getDb();
+    const rows = await db.collection("settings").find({}).toArray();
+    const settings: Record<string, string> = {};
+    rows.forEach((row) => {
+      settings[row.key] = row.value;
+    });
+    return NextResponse.json(settings);
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 }
 
 export async function PUT(req: NextRequest) {
-  requireAdmin(req);
-  const body = await req.json();
-  const keys = Object.keys(body);
-  const statement = db.prepare("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value");
-  db.transaction(() => {
-    keys.forEach((key) => {
-      statement.run(key, String(body[key] ?? ""));
-    });
-  })();
-  return NextResponse.json({ success: true });
+  try {
+    await requireAdmin(req);
+    const body = await req.json();
+    const keys = Object.keys(body);
+    const db = await getDb();
+
+    await Promise.all(
+      keys.map((key) =>
+        db.collection("settings").updateOne(
+          { key },
+          { $set: { key, value: String(body[key] ?? "") } },
+          { upsert: true }
+        )
+      )
+    );
+
+    return NextResponse.json({ success: true });
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 }
