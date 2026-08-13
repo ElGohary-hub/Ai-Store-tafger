@@ -337,24 +337,24 @@ export default function Home() {
       </header>
 
       {/* المنتجات */}
-      <section className="mx-auto max-w-5xl px-6 py-14">
-        <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
+      <section className="mx-auto max-w-7xl px-4 sm:px-6 py-14">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
           {products.map((p) => (
             <article 
               key={p.id} 
-              className="flex flex-col overflow-hidden rounded-3xl border border-white/15 bg-gradient-to-b from-[#1a1f2c] to-[#11141d] shadow-[0_15px_35px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.1)] transition-all duration-300 hover:scale-[1.03] hover:border-[#E8A33D]/60 hover:shadow-[0_20px_40px_rgba(232,163,61,0.2)]"
+              className="flex flex-col overflow-hidden rounded-3xl border border-white/15 bg-gradient-to-b from-[#1a1f2c] to-[#11141d] shadow-[0_15px_35px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.1)] transition-all duration-300 hover:scale-[1.02] hover:border-[#E8A33D]/60 hover:shadow-[0_20px_40px_rgba(232,163,61,0.2)]"
             >
-              <div className="h-56 w-full relative overflow-hidden bg-black flex items-center justify-center p-4">
+              <div className="h-48 sm:h-52 w-full relative overflow-hidden bg-black flex items-center justify-center p-4">
                  <img src={p.image} alt={p.name} className="h-full w-full object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,0.9)] transition-transform duration-500 hover:scale-105" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
               </div>
-              <div className="flex flex-col items-center text-center gap-2 p-6 pb-3">
-                <h2 className="font-display text-2xl font-bold text-white drop-shadow-md">{p.name}</h2>
-                <div className="font-display text-xl font-extrabold text-[#E8A33D] drop-shadow-[0_2px_8px_rgba(232,163,61,0.4)]">
+              <div className="flex flex-col items-center text-center gap-2 p-5 pb-3">
+                <h2 className="font-display text-xl sm:text-2xl font-bold text-white drop-shadow-md">{p.name}</h2>
+                <div className="font-display text-lg sm:text-xl font-extrabold text-[#E8A33D] drop-shadow-[0_2px_8px_rgba(232,163,61,0.4)]">
                   {formatPrice(p.price, settings.currency, Number(settings.usdt_rate))}
                 </div>
-                <p className="mt-1 text-sm text-white/70 line-clamp-3 leading-relaxed">{p.detail}</p>
+                <p className="mt-1 text-sm sm:text-[15px] font-medium text-white/85 line-clamp-3 leading-relaxed">{p.detail}</p>
               </div>
-              <div className="mt-auto grid grid-cols-2 gap-3 p-6 pt-2">
+              <div className="mt-auto grid grid-cols-2 gap-2.5 p-5 pt-2">
                 <button 
                   onClick={() => handleDirectBuy(p)} 
                   className="rounded-2xl bg-gradient-to-r from-[#E8A33D] to-[#d69230] py-3 font-display text-sm font-extrabold text-[#10131A] transition-all hover:brightness-110 active:scale-95 shadow-[0_5px_15px_rgba(232,163,61,0.4),inset_0_2px_3px_rgba(255,255,255,0.4)]"
