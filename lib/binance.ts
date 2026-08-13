@@ -30,6 +30,56 @@ export interface BinanceDeposit {
   completeTime: number;
 }
 
+export async function getDepositAddress(
+  coin = "USDT",
+  network?: string
+): Promise<{ address: string; coin: string; tag: string; url: string }> {
+  const apiKey = getApiKey();
+  const secretKey = getSecretKey();
+
+  if (apiKey && secretKey) {
+    try {
+      const timestamp = Date.now();
+      const queryParams: Record<string, string> = {
+        coin,
+        timestamp: timestamp.toString(),
+        recvWindow: "60000",
+      };
+      if (network) queryParams.network = network;
+
+      const queryString = new URLSearchParams(queryParams).toString();
+      const signature = generateSignature(queryString, secretKey);
+      const fullUrl = `${BINANCE_BASE_URL}/sapi/v1/capital/deposit/address?${queryString}&signature=${signature}`;
+
+      const res = await fetch(fullUrl, {
+        method: "GET",
+        headers: {
+          "X-MBX-APIKEY": apiKey,
+          "Content-Type": "application/json",
+        },
+        cache: "no-store",
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.address) {
+          return data;
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to fetch deposit address from Binance live API, falling back to static config:", e);
+    }
+  }
+
+  // Fallback to static addresses from environment
+  let address = "";
+  if (network === "TRX") address = process.env.NEXT_PUBLIC_USDT_TRC20_ADDRESS || "TN9kZMYS53JbuHQbsGPGDvJXD4gUhPVZi7";
+  else if (network === "BSC") address = process.env.NEXT_PUBLIC_USDT_BEP20_ADDRESS || "0xfa90bd46019435b0aa3d0bc69ee2bf5a432e2806";
+  else address = process.env.NEXT_PUBLIC_USDT_TRC20_ADDRESS || "TN9kZMYS53JbuHQbsGPGDvJXD4gUhPVZi7";
+
+  return { address, coin, tag: "", url: "" };
+}
+
 export async function getDepositHistory(params: {
   coin?: string;
   status?: number;
