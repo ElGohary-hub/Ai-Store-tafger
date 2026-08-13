@@ -486,14 +486,21 @@ export default function AdminPanel({ admin }: { admin: AdminInfo }) {
               <div className="space-y-6">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <h2 className="text-2xl font-semibold text-white">Products</h2>
-                    <p className="mt-1 text-sm text-slate-400">Add, edit, duplicate, and manage your product inventory.</p>
+                    <div className="flex items-center gap-3">
+                      <h2 className="text-2xl font-semibold text-white">Products</h2>
+                      <span className="rounded-full bg-amber-500/10 border border-amber-500/30 px-3 py-0.5 text-xs font-bold text-amber-400">
+                        {products.length} Products
+                      </span>
+                    </div>
+                    <p className="mt-1 text-sm text-slate-400">Add, edit, duplicate, and manage your complete product catalog.</p>
                   </div>
-                  <button onClick={() => { setEditingProduct(null); setProductForm({ visible: 1, discount_enabled: 0, featured: 0, best_seller: 0, is_new: 0, stock: 0, sort_order: 0 }); setShowProductModal(true); }} className="rounded-2xl bg-amber-500 px-5 py-3 text-sm font-semibold text-slate-950 shadow-lg shadow-amber-500/20 transition hover:bg-amber-400">Add product</button>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button onClick={() => { setEditingProduct(null); setProductForm({ visible: 1, discount_enabled: 0, featured: 0, best_seller: 0, is_new: 0, stock: 0, sort_order: 0 }); setShowProductModal(true); }} className="rounded-2xl bg-amber-500 px-5 py-3 text-sm font-semibold text-slate-950 shadow-lg shadow-amber-500/20 transition hover:bg-amber-400">+ Add product</button>
+                  </div>
                 </div>
 
                 <div className="overflow-hidden rounded-3xl border border-slate-800 bg-slate-900 shadow-lg">
-                  <div className="grid grid-cols-[1.2fr_1fr_1fr_1fr_0.8fr] gap-px bg-slate-800 px-4 py-3 text-xs uppercase tracking-[0.12em] text-slate-500">
+                  <div className="grid grid-cols-[1.5fr_1fr_1fr_0.8fr_1fr] gap-px bg-slate-800 px-4 py-3 text-xs uppercase tracking-[0.12em] text-slate-500">
                     <span>Product</span>
                     <span>Price</span>
                     <span>Category</span>
@@ -502,26 +509,44 @@ export default function AdminPanel({ admin }: { admin: AdminInfo }) {
                   </div>
                   <div className="divide-y divide-slate-800">
                     {products.map((product) => (
-                      <div key={product.id} className="grid grid-cols-[1.2fr_1fr_1fr_1fr_0.8fr] items-center gap-px bg-slate-950 px-4 py-4 text-sm text-slate-300">
-                        <div>
-                          <p className="font-semibold text-white">{product.name}</p>
-                          <p className="text-xs text-slate-500">{product.sku}</p>
+                      <div key={product.id} className="grid grid-cols-[1.5fr_1fr_1fr_0.8fr_1fr] items-center gap-px bg-slate-950 px-4 py-4 text-sm text-slate-300 hover:bg-slate-900/50 transition">
+                        <div className="flex items-center gap-3">
+                          {product.image ? (
+                            <img src={product.image} alt={product.name} className="w-11 h-11 object-contain rounded-xl bg-black/60 p-1 border border-slate-800 flex-shrink-0" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                          ) : (
+                            <div className="w-11 h-11 rounded-xl bg-slate-800 flex items-center justify-center text-slate-500 text-xs font-bold flex-shrink-0">IMG</div>
+                          )}
+                          <div className="min-w-0">
+                            <p className="font-semibold text-white truncate">{product.name}</p>
+                            <p className="text-xs text-slate-500 truncate">{product.sku}</p>
+                          </div>
                         </div>
                         <div>
-                          <p>{product.price} {settings.currency || "ج.م"}</p>
-                          {product.discount_enabled ? <p className="text-xs text-emerald-300">-{product.discount_percentage}%</p> : null}
+                          <p className="font-bold text-amber-400">{product.price} {settings.currency || "ج.م"}</p>
+                          {product.discount_enabled ? <p className="text-xs text-emerald-300">-{product.discount_percentage}% off</p> : null}
                         </div>
-                        <div>{product.category_name || "Uncategorized"}</div>
-                        <div>{product.visible ? "Visible" : "Hidden"}</div>
-                        <div className="flex flex-wrap justify-end gap-2">
-                          <button onClick={() => { setEditingProduct(product); setProductForm(product); setShowProductModal(true); }} className="rounded-2xl border border-slate-700 bg-slate-950 px-3 py-2 text-[11px] font-semibold text-slate-200 transition hover:bg-slate-800">Edit</button>
-                          <button onClick={() => duplicateProduct(product)} className="rounded-2xl border border-slate-700 bg-slate-950 px-3 py-2 text-[11px] font-semibold text-slate-200 transition hover:bg-slate-800">Duplicate</button>
-                          <button onClick={() => deleteProduct(product.id)} className="rounded-2xl border border-rose-500 bg-rose-500/10 px-3 py-2 text-[11px] font-semibold text-rose-300 transition hover:bg-rose-500/20">Delete</button>
-                          <button onClick={() => toggleVisibility(product)} className="rounded-2xl border border-amber-500 bg-amber-500/10 px-3 py-2 text-[11px] font-semibold text-amber-300 transition hover:bg-amber-500/20">{product.visible ? "Hide" : "Show"}</button>
+                        <div>
+                          <span className="inline-block rounded-lg bg-slate-800 px-2.5 py-1 text-xs text-slate-300">
+                            {product.category_name || "General"}
+                          </span>
+                        </div>
+                        <div>
+                          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                            product.visible ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-slate-800 text-slate-400"
+                          }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${product.visible ? "bg-emerald-400" : "bg-slate-500"}`}></span>
+                            {product.visible ? "Visible" : "Hidden"}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap justify-end gap-1.5">
+                          <button onClick={() => { setEditingProduct(product); setProductForm(product); setShowProductModal(true); }} className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:bg-slate-800">Edit</button>
+                          <button onClick={() => duplicateProduct(product)} className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:bg-slate-800">Copy</button>
+                          <button onClick={() => deleteProduct(product.id)} className="rounded-xl border border-rose-500/50 bg-rose-500/10 px-3 py-1.5 text-xs font-semibold text-rose-300 transition hover:bg-rose-500/20">Delete</button>
+                          <button onClick={() => toggleVisibility(product)} className="rounded-xl border border-amber-500/50 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-300 transition hover:bg-amber-500/20">{product.visible ? "Hide" : "Show"}</button>
                         </div>
                       </div>
                     ))}
-                    {!products.length && <div className="p-6 text-center text-slate-500">No products available yet.</div>}
+                    {!products.length && <div className="p-8 text-center text-slate-500">No products available yet.</div>}
                   </div>
                 </div>
               </div>
