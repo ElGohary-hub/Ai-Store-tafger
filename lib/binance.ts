@@ -2,6 +2,28 @@ import crypto from "crypto";
 
 const BINANCE_BASE_URL = "https://api.binance.com";
 
+let serverTimeOffset = 0;
+let lastTimeSync = 0;
+
+async function getSyncedTimestamp(): Promise<number> {
+  const now = Date.now();
+  if (now - lastTimeSync > 5 * 60 * 1000) {
+    try {
+      const res = await fetch(`${BINANCE_BASE_URL}/api/v3/time`, { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && typeof data.serverTime === "number") {
+          serverTimeOffset = data.serverTime - Date.now();
+          lastTimeSync = now;
+        }
+      }
+    } catch {
+      // ignore network issue on time sync
+    }
+  }
+  return Date.now() + serverTimeOffset - 500;
+}
+
 function getApiKey(): string {
   return process.env.BINANCE_API_KEY || "";
 }
@@ -39,7 +61,7 @@ export async function getDepositAddress(
 
   if (apiKey && secretKey) {
     try {
-      const timestamp = Date.now();
+      const timestamp = await getSyncedTimestamp();
       const queryParams: Record<string, string> = {
         coin,
         timestamp: timestamp.toString(),
@@ -75,6 +97,7 @@ export async function getDepositAddress(
   let address = "";
   if (network === "TRX") address = process.env.NEXT_PUBLIC_USDT_TRC20_ADDRESS || "TN9kZMYS53JbuHQbsGPGDvJXD4gUhPVZi7";
   else if (network === "BSC") address = process.env.NEXT_PUBLIC_USDT_BEP20_ADDRESS || "0xfa90bd46019435b0aa3d0bc69ee2bf5a432e2806";
+  else if (network === "APT") address = process.env.NEXT_PUBLIC_USDT_APT_ADDRESS || "0xa236707d87a33bed07e75aed59471c605c22846ddd1f464e9ee9910383dbf528";
   else address = process.env.NEXT_PUBLIC_USDT_TRC20_ADDRESS || "TN9kZMYS53JbuHQbsGPGDvJXD4gUhPVZi7";
 
   return { address, coin, tag: "", url: "" };
@@ -96,7 +119,7 @@ export async function getDepositHistory(params: {
     throw new Error("Binance API credentials (BINANCE_API_KEY, BINANCE_SECRET_KEY) are missing in environment.");
   }
 
-  const timestamp = Date.now();
+  const timestamp = await getSyncedTimestamp();
   const queryParams: Record<string, string> = {
     timestamp: timestamp.toString(),
     recvWindow: "60000",
@@ -131,6 +154,10 @@ export async function getDepositHistory(params: {
   return await res.json();
 }
 
+export type PaymentStatus = "exact" | "underpaid" | "overpaid";
+
+const AMOUNT_TOLERANCE = 0.001; // USDT floating-point tolerance
+
 export async function checkPaymentDeposit(options: {
   expectedAmount: number;
   coin?: string;
@@ -148,8 +175,11 @@ export async function checkPaymentDeposit(options: {
     usedDepositIds = [],
   } = options;
 
-  // Search window: from 10 minutes before order creation until now + 5 mins
-  const startTime = Math.max(0, createdAtTimestamp - 10 * 60 * 1000);
+  // Search window: If user provided TxHash, search last 24h; otherwise search from order creation - 15m
+  const isHashProvided = Boolean(txHash && txHash.trim().length > 0);
+  const startTime = isHashProvided
+    ? Math.max(0, Date.now() - 24 * 60 * 60 * 1000)
+    : Math.max(0, createdAtTimestamp - 15 * 60 * 1000);
   const endTime = Date.now() + 5 * 60 * 1000;
 
   const deposits = await getDepositHistory({
@@ -162,12 +192,23 @@ export async function checkPaymentDeposit(options: {
 
   // Filter out any deposits already claimed/used by other orders
   const availableDeposits = deposits.filter((d) => {
-    const isUsedHash = usedTxHashes.some(
-      (h) => h && h.toLowerCase() === d.txId.toLowerCase()
-    );
-    const isUsedId = usedDepositIds.includes(d.id);
+    const isUsedHash = usedTxHashes.some((h) => {
+      if (!h) return false;
+      const cleanH = h.toLowerCase().replace(/^0x/, "");
+      const cleanD = d.txId.toLowerCase().replace(/^0x/, "");
+      return cleanH === cleanD;
+    });
+    const isUsedId = usedDepositIds.some((id) => id && id.toString() === d.id.toString());
     return !isUsedHash && !isUsedId;
   });
+
+  /** Classify an actual amount vs expected */
+  function classifyAmount(actualAmount: number, expected: number): PaymentStatus {
+    const diff = actualAmount - expected;
+    if (Math.abs(diff) <= AMOUNT_TOLERANCE) return "exact";
+    if (diff < 0) return "underpaid";
+    return "overpaid";
+  }
 
   // CASE 1: User explicitly provided a TxHash / TxID
   if (txHash && txHash.trim().length > 0) {
@@ -180,29 +221,45 @@ export async function checkPaymentDeposit(options: {
     });
 
     if (matchByHash) {
-      // Also verify that the deposit amount is at least the expected amount
-      const depAmount = parseFloat(matchByHash.amount);
-      if (depAmount >= expectedAmount - 0.001) {
-        return {
-          verified: true,
-          deposit: matchByHash,
-          matchType: "txHash",
-        };
-      } else {
+      const actualAmount = parseFloat(matchByHash.amount);
+      const paymentStatus = classifyAmount(actualAmount, expectedAmount);
+      const difference = Number((actualAmount - expectedAmount).toFixed(6));
+
+      if (paymentStatus === "underpaid") {
+        // Found the TX but amount is less — NOT verified, but return deposit for storage
         return {
           verified: false,
-          error: `المبلغ المحول (${depAmount} USDT) أقل من المطلوب (${expectedAmount} USDT).`,
+          paymentStatus,
+          deposit: matchByHash,
+          actualAmount,
+          expectedAmount,
+          difference,
+          matchType: "txHash",
+          error: `المبلغ المحول (${actualAmount} USDT) أقل من المطلوب (${expectedAmount} USDT). الفرق: ${Math.abs(difference).toFixed(6)} USDT.`,
           depositsFound: availableDeposits.length,
         };
       }
+
+      // exact or overpaid — both are verified
+      return {
+        verified: true,
+        paymentStatus,
+        deposit: matchByHash,
+        actualAmount,
+        expectedAmount,
+        difference,
+        matchType: "txHash",
+      };
     }
 
     // If user provided a TxHash and it didn't match any unused deposit on Binance,
-    // FAIL STRICTLY! Do NOT silently fall back to guessing by amount.
+    // Check if it was already used by another order to return a clear duplicate error
     const wasAlreadyUsed = deposits.some((d) => {
       const depTxId = d.txId.toLowerCase();
-      return (depTxId === cleanHash || depTxId.replace(/^0x/, "") === cleanHash.replace(/^0x/, "")) &&
-        (usedTxHashes.includes(d.txId) || usedDepositIds.includes(d.id));
+      const matchGiven = (depTxId === cleanHash || depTxId.replace(/^0x/, "") === cleanHash.replace(/^0x/, ""));
+      const isKnownUsed = usedTxHashes.some((h) => h && h.toLowerCase().replace(/^0x/, "") === depTxId.replace(/^0x/, "")) ||
+                          usedDepositIds.some((id) => id && id.toString() === d.id.toString());
+      return matchGiven && isKnownUsed;
     });
 
     if (wasAlreadyUsed) {
@@ -221,19 +278,26 @@ export async function checkPaymentDeposit(options: {
   }
 
   // CASE 2: No TxHash provided -> Auto-match by amount and timestamp
-  // Must match exact expected amount (tolerance: 0.001) and arrived after order creation
+  // Must match exact expected amount (tolerance: AMOUNT_TOLERANCE) and arrived after order creation
   const matchByAmount = availableDeposits.find((d) => {
     const depAmount = parseFloat(d.amount);
-    const amountMatches = Math.abs(depAmount - expectedAmount) <= 0.001;
+    const amountMatches = Math.abs(depAmount - expectedAmount) <= AMOUNT_TOLERANCE;
     // Must have arrived around or after order creation (within 30 mins window)
     const timeValid = d.completeTime >= (createdAtTimestamp - 2 * 60 * 1000);
     return amountMatches && timeValid;
   });
 
   if (matchByAmount) {
+    const actualAmount = parseFloat(matchByAmount.amount);
+    const paymentStatus = classifyAmount(actualAmount, expectedAmount);
+    const difference = Number((actualAmount - expectedAmount).toFixed(6));
     return {
       verified: true,
+      paymentStatus,
       deposit: matchByAmount,
+      actualAmount,
+      expectedAmount,
+      difference,
       matchType: "amount_and_time",
     };
   }

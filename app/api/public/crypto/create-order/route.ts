@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
     const orderId = `CRYPTO-${Date.now().toString(36).toUpperCase()}-${randomBytes(2).toString("hex").toUpperCase()}`;
     const db = await getDb();
 
-    // Insert into crypto_payments collection
+    // Insert pending session into crypto_payments collection
     await db.collection("crypto_payments").insertOne({
       order_id: orderId,
       customer_name: customerName || "عميل كريبتو",
@@ -28,21 +28,9 @@ export async function POST(req: NextRequest) {
       created_at: new Date(),
     });
 
-    // Also register in general orders collection
-    const orderResult = await db.collection("orders").insertOne({
-      customer_name: customerName || "عميل كريبتو",
-      customer_email: "",
-      customer_phone: customerPhone || "",
-      status: "pending",
-      total: Number(amount),
-      metadata: JSON.stringify({ cryptoOrderId: orderId, network, currency, productName, paymentMethod: "binance" }),
-      created_at: new Date(),
-    });
-
     return NextResponse.json({
       success: true,
       orderId,
-      internalOrderId: orderResult.insertedId.toString(),
       amount: Number(amount),
       currency,
       network,

@@ -32,53 +32,65 @@ export default function AdminLogin() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 px-4 py-12 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-md rounded-3xl border border-slate-700/80 bg-slate-900/95 p-8 shadow-2xl shadow-black/40 backdrop-blur-xl">
-        <div className="mb-8 text-center">
-          <p className="text-sm uppercase tracking-[0.3em] text-slate-400">Dashboard Login</p>
-          <h1 className="mt-4 text-3xl font-semibold text-white">AI STORE Admin</h1>
-          <p className="mt-2 text-sm text-slate-400">Enter your admin credentials to manage products, settings, and content.</p>
+    <main className="flex min-h-screen items-center justify-center bg-[#0a0c10] px-4 py-8 sm:px-6 lg:px-8 relative overflow-hidden text-white">
+      {/* Background ambient glow matching storefront */}
+      <div className="absolute inset-0 -z-10 opacity-[0.05]">
+        <div className="h-full w-full" style={{ backgroundImage: "repeating-linear-gradient(-45deg, #E8A33D 0, #E8A33D 2px, transparent 2px, transparent 25px)" }} />
+      </div>
+
+      <div className="w-full max-w-md rounded-3xl border border-white/15 bg-gradient-to-b from-[#1a1f2c] to-[#11141d] p-6 sm:p-8 shadow-[0_25px_50px_rgba(0,0,0,0.9),inset_0_1px_0_rgba(255,255,255,0.1)] backdrop-blur-xl">
+        <div className="mb-6 text-center sm:mb-8">
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-[#E8A33D]/30 bg-[#E8A33D]/15 px-3.5 py-1 text-xs font-bold text-[#E8A33D]">
+            <span>🛡️</span>
+            <span className="uppercase tracking-wider">Dashboard Login</span>
+          </div>
+          <h1 className="mt-3 text-2xl sm:text-3xl font-extrabold text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.7)]">AI STORE Admin</h1>
+          <p className="mt-1.5 text-xs sm:text-sm text-white/60">Enter your credentials to access the management portal.</p>
         </div>
 
-        <form className="space-y-5" onSubmit={handleSubmit}>
+        <form className="space-y-4 sm:space-y-5" onSubmit={handleSubmit}>
           <div>
-            <label className="block text-sm font-medium text-slate-300">Email</label>
+            <label className="block text-xs sm:text-sm font-semibold text-white/80">Email Address</label>
             <input
               type="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-white shadow-sm outline-none transition focus:border-slate-500"
+              className="mt-1.5 w-full rounded-2xl border border-white/15 bg-black/60 px-4 py-3 text-sm text-white shadow-inner outline-none transition placeholder:text-white/30 focus:border-[#E8A33D] focus:ring-1 focus:ring-[#E8A33D]/50"
               placeholder="admin@aistore.com"
               required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-300">Password</label>
+            <label className="block text-xs sm:text-sm font-semibold text-white/80">Password</label>
             <input
               type="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-white shadow-sm outline-none transition focus:border-slate-500"
+              className="mt-1.5 w-full rounded-2xl border border-white/15 bg-black/60 px-4 py-3 text-sm text-white shadow-inner outline-none transition placeholder:text-white/30 focus:border-[#E8A33D] focus:ring-1 focus:ring-[#E8A33D]/50"
               placeholder="••••••••"
               required
             />
           </div>
 
-          {error ? <div className="rounded-2xl bg-rose-500/10 px-4 py-3 text-sm text-rose-300">{error}</div> : null}
+          {error && (
+            <div className="rounded-2xl bg-rose-500/15 border border-rose-500/30 px-4 py-3 text-xs sm:text-sm text-rose-300">
+              {error}
+            </div>
+          )}
 
           <button
             type="submit"
             disabled={isLoading}
-            className="inline-flex w-full items-center justify-center rounded-2xl bg-gradient-to-r from-amber-500 to-amber-400 px-4 py-3 text-sm font-semibold text-slate-950 shadow-lg shadow-black/20 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex w-full items-center justify-center rounded-2xl bg-gradient-to-r from-[#E8A33D] to-[#d69230] px-4 py-3.5 text-sm font-extrabold text-[#10131A] shadow-[0_5px_15px_rgba(232,163,61,0.4),inset_0_2px_3px_rgba(255,255,255,0.4)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60 active:scale-[0.98]"
           >
-            {isLoading ? "Signing in..." : "Sign in"}
+            {isLoading ? "Signing in..." : "Sign in to Dashboard"}
           </button>
 
-          <div className="mt-4 rounded-2xl border border-slate-700 bg-slate-950/80 px-4 py-4 text-xs text-slate-500">
-            <p className="font-medium text-slate-300">Default admin access</p>
-            <p>Email: <span className="text-slate-100">admin@aistore.com</span></p>
-            <p>Password: <span className="text-slate-100">Admin1234!</span></p>
+          <div className="mt-4 rounded-2xl border border-white/10 bg-black/50 p-4 text-xs text-white/60 space-y-1 shadow-inner">
+            <p className="font-semibold text-white/90">Default Admin Credentials</p>
+            <p>Email: <span className="font-mono text-[#E8A33D] font-bold">admin@aistore.com</span></p>
+            <p>Password: <span className="font-mono text-[#E8A33D] font-bold">Admin1234!</span></p>
           </div>
         </form>
       </div>

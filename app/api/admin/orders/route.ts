@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
         customer_email: o.customer_email || "",
         customer_phone: o.customer_phone || "",
         status: o.status || "pending",
-        total: o.total || 0,
+        total: Math.round(Number(o.total || 0) * 100) / 100,
         metadata: o.metadata || "",
         created_at: o.created_at || new Date().toISOString(),
       }))
@@ -59,6 +59,32 @@ export async function PUT(req: NextRequest) {
     await db.collection("orders").updateOne(query, { $set: { status, updatedAt: new Date() } });
 
     return NextResponse.json({ success: true });
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    await requireAdmin(req);
+    const body = await req.json();
+    const { id, clearAll } = body;
+
+    const db = await getDb();
+
+    if (clearAll) {
+      await db.collection("orders").deleteMany({});
+      return NextResponse.json({ success: true, message: "All orders deleted" });
+    }
+
+    if (!id) {
+      return NextResponse.json({ error: "Order ID is required." }, { status: 400 });
+    }
+
+    const query = ObjectId.isValid(id) ? { _id: new ObjectId(id) } : { _id: id };
+    const result = await db.collection("orders").deleteOne(query);
+
+    return NextResponse.json({ success: true, deletedCount: result.deletedCount });
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

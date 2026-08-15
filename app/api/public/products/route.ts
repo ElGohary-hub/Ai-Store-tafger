@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
     const db = await getDb();
@@ -30,9 +32,17 @@ export async function GET() {
       image: p.image,
       sort_order: p.sort_order,
       tags: p.tags,
+      sales_count: Number(p.sales_count) || 0,
+      fake_sales_count: Number(p.fake_sales_count) || 0,
+      long_description: p.long_description || p.description || "",
+      warranty: p.warranty || "",
     }));
 
-    return NextResponse.json(products);
+    return NextResponse.json(products, {
+      headers: {
+        "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120",
+      },
+    });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

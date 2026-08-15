@@ -37,6 +37,10 @@ export async function GET(req: NextRequest) {
         image: p.image,
         sort_order: p.sort_order,
         tags: p.tags,
+        sales_count: Number(p.sales_count) || 0,
+        fake_sales_count: Number(p.fake_sales_count) || 0,
+        long_description: p.long_description || p.description || "",
+        warranty: p.warranty || "",
       }))
     );
   } catch {
@@ -52,6 +56,8 @@ export async function POST(req: NextRequest) {
       sku,
       name,
       description,
+      long_description,
+      warranty,
       price,
       original_price,
       discount_enabled,
@@ -65,6 +71,8 @@ export async function POST(req: NextRequest) {
       image,
       sort_order,
       tags,
+      sales_count,
+      fake_sales_count,
     } = body;
 
     if (!name) {
@@ -76,6 +84,8 @@ export async function POST(req: NextRequest) {
       sku: sku || name.toLowerCase().replace(/\s+/g, "-"),
       name,
       description: description || "",
+      long_description: long_description || description || "",
+      warranty: warranty || "",
       price: Number(price) || 0,
       original_price: Number(original_price) || 0,
       discount_enabled: discount_enabled ? 1 : 0,
@@ -89,6 +99,8 @@ export async function POST(req: NextRequest) {
       image: image || "",
       sort_order: Number(sort_order) || 0,
       tags: tags || "",
+      sales_count: Number(sales_count) || 0,
+      fake_sales_count: Number(fake_sales_count) || 0,
       createdAt: new Date(),
     });
 
@@ -107,6 +119,8 @@ export async function PUT(req: NextRequest) {
       sku,
       name,
       description,
+      long_description,
+      warranty,
       price,
       original_price,
       discount_enabled,
@@ -120,6 +134,8 @@ export async function PUT(req: NextRequest) {
       image,
       sort_order,
       tags,
+      sales_count,
+      fake_sales_count,
     } = body;
 
     if (!id || !name) {
@@ -134,6 +150,8 @@ export async function PUT(req: NextRequest) {
         sku: sku || name.toLowerCase().replace(/\s+/g, "-"),
         name,
         description: description || "",
+        long_description: long_description || description || "",
+        warranty: warranty || "",
         price: Number(price) || 0,
         original_price: Number(original_price) || 0,
         discount_enabled: discount_enabled ? 1 : 0,
@@ -147,6 +165,8 @@ export async function PUT(req: NextRequest) {
         image: image || "",
         sort_order: Number(sort_order) || 0,
         tags: tags || "",
+        sales_count: Number(sales_count) || 0,
+        fake_sales_count: Number(fake_sales_count) || 0,
         updatedAt: new Date(),
       },
     });

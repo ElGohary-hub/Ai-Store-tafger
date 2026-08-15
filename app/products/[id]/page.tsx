@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
 
 type Product = {
   id: string;
@@ -9,6 +10,7 @@ type Product = {
   name: string;
   description?: string;
   detail?: string;
+  long_description?: string;
   price: number | string;
   original_price?: number;
   discount_enabled?: number;
@@ -18,13 +20,13 @@ type Product = {
   is_new?: number;
   visible?: number;
   stock?: number;
-  category_id?: number | null;
+  category_id?: string | number | null;
+  category_name?: string;
   image: string;
   sort_order?: number;
   tags?: string;
   sales_count?: number;
   fake_sales_count?: number;
-  long_description?: string;
   warranty?: string;
 };
 
@@ -42,7 +44,7 @@ type SettingsState = {
   usdt_rate?: string;
 };
 
-const INITIAL_SETTINGS: SettingsState = {
+const DEFAULT_SETTINGS: SettingsState = {
   website_name: "AI STORE",
   hero_title: "اختر الباقة المناسبة لك",
   hero_description: "اشتراكات مدعومة بتفعيل احترافي وخدمة عملاء سريعة.",
@@ -56,64 +58,57 @@ const INITIAL_SETTINGS: SettingsState = {
   usdt_rate: "50",
 };
 
-const DEFAULT_PRODUCTS: Product[] = [
-  { id: "canva", name: "Canva Pro", detail: "اشتراك Canva Pro مدي الحياه والدفع بعد التفعيل. يتم التفعيل علي حسابك الشخصي وبشكل رسمي من كانفا!", price: 70, image: "/p3.png", sales_count: 0, fake_sales_count: 0 },
-  { id: "google", name: "Google Plan", detail: "تشمل: Gemini Pro, Antigravity, Nano Banana, NotebookLM, 5TB تخزين سحابي, Google Flow 1000 Credit/M", price: 70, image: "/p4.png", sales_count: 0, fake_sales_count: 0 },
-  { id: "capcut", name: "CapCut", detail: "التفعيل لمدة شهر فقط، تستلم حساب خاص فيك متفعل جاهز", price: 70, image: "/p10.png", sales_count: 0, fake_sales_count: 0 },
-  { id: "coursera", name: "Coursera", detail: "باقة البلص، كل الكورسات مفتوحة، يتم ارسال حساب خاص فيك متفعل جاهز", price: 70, image: "/p6.png", sales_count: 0, fake_sales_count: 0 },
-  { id: "office", name: "Microsoft Office 365", detail: "باقة البلص، 5 أجهزة، 100 جيجابايت ون درايف، تفعيل 12 شهر (ويندوز فقط)", price: 70, image: "/p5.png", sales_count: 0, fake_sales_count: 0 },
-  { id: "leonardo", name: "Leonardo Ai", detail: "شهر واحد وصول كامل، 8500 رصيد، حساب خاص بك، تفعيل مباشر", price: 70, image: "/p16.png", sales_count: 0, fake_sales_count: 0 },
-  { id: "notion", name: "Notion", detail: "باقة البلص، باقي التفاصيل كلمني", price: 70, image: "/p13.png", sales_count: 0, fake_sales_count: 0 },
-  { id: "adobe", name: "Adobe Express", detail: "عضوية مميزة لمدة 12 شهر، لا حاجة لـ VPN أو VISA، تفعيل مباشر", price: 70, image: "/p14.png", sales_count: 0, fake_sales_count: 0 },
-  { id: "gamma", name: "Gamma Ai", detail: "حسب الباقة، تواصل معي للتفاصيل", price: 70, image: "/p11.png", sales_count: 0, fake_sales_count: 0 },
-  { id: "youtube", name: "YouTube", detail: "حسب المدة والباقة، تواصل معي للتفاصيل", price: 70, image: "/p12.png", sales_count: 0, fake_sales_count: 0 },
-  { id: "chatgpt", name: "ChatGPT", detail: "حسب المدة والباقة، تواصل معي للتفاصيل", price: 70, image: "/p15.png", sales_count: 0, fake_sales_count: 0 },
-  { id: "claude", name: "Claude", detail: "حسب الباقة، تواصل معي للتفاصيل", price: 70, image: "/p7.png", sales_count: 0, fake_sales_count: 0 },
-  { id: "manus", name: "Manus", detail: "حسب الباقة، تواصل معي للتفاصيل", price: 70, image: "/p1.png", sales_count: 0, fake_sales_count: 0 },
-  { id: "higgsfield", name: "Higgsfield", detail: "حسب الباقة، تواصل معي للتفاصيل", price: 70, image: "/p2.png", sales_count: 0, fake_sales_count: 0 },
-  { id: "grok", name: "Grok", detail: "حسب الباقة، تواصل معي للتفاصيل", price: 70, image: "/p8.png", sales_count: 0, fake_sales_count: 0 },
-  { id: "figma", name: "Figma", detail: "حسب الباقة، تواصل معي للتفاصيل", price: 70, image: "/p9.png", sales_count: 0, fake_sales_count: 0 },
-];
-
 function formatPrice(p: number | string, currency = "ج.م", usdtRate = 50) {
   if (typeof p === "number") {
     const rate = usdtRate > 0 ? usdtRate : 50;
-    const usdVal = (p / rate).toFixed(2).replace(/\.00$/, "").replace(/(\.[1-9])0$/, "$1");
-    return (
-      <span className="flex items-center justify-center gap-1.5" dir="rtl">
-        <span>{p} {currency}</span>
-        <span className="text-white/40 font-medium">/</span>
-        <span dir="ltr">{usdVal}$</span>
-      </span>
-    );
+    const usdtPrice = (p / rate).toFixed(2);
+    return `${p} ${currency} / ${usdtPrice}$`;
   }
-  return <span dir="rtl">{p}</span>;
+  return p;
 }
 
-export default function Home() {
-  const [products, setProducts] = useState<Product[]>(DEFAULT_PRODUCTS);
-  const [settings, setSettings] = useState<SettingsState>(INITIAL_SETTINGS);
-  const [cart, setCart] = useState<Record<string, number>>({});
-  const [isCartOpen, setIsCartOpen] = useState(false);
+export default function ProductDetailsPage() {
+  const params = useParams();
+  const router = useRouter();
+  const productId = params?.id as string;
+
+  const [product, setProduct] = useState<Product | null>(null);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [settings, setSettings] = useState<SettingsState>(DEFAULT_SETTINGS);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  // Payment Modals States (Identical to Homepage)
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
-  
-  const [isBinanceModalOpen, setIsBinanceModalOpen] = useState(false);
   const [isVodafoneModalOpen, setIsVodafoneModalOpen] = useState(false);
   const [transferMethod, setTransferMethod] = useState<"instapay" | "vodafone">("instapay");
-  
-  const [copied, setCopied] = useState(false);
-  const [txIdInput, setTxIdInput] = useState("");
+  const [isBinanceModalOpen, setIsBinanceModalOpen] = useState(false);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [cart, setCart] = useState<Record<string, number>>({});
+  const [isCheckoutFromCart, setIsCheckoutFromCart] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
+
+  // Vodafone form states
   const [senderPhone, setSenderPhone] = useState("");
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState("");
+  const [phoneError, setPhoneError] = useState("");
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Binance & Crypto states
+  const [cryptoAddresses, setCryptoAddresses] = useState<Array<{ networkId: string; networkName: string; address: string; tag: string }>>([]);
+  const [selectedNetwork, setSelectedNetwork] = useState<string>("PAY_ID");
+  const [currentCryptoOrder, setCurrentCryptoOrder] = useState<any>(null);
+  const [txIdInput, setTxIdInput] = useState("");
   const [isVerifying, setIsVerifying] = useState(false);
   const [verificationResult, setVerificationResult] = useState<"success" | "overpaid" | "underpaid" | "exhausted" | null>(null);
+  const [verificationError, setVerificationError] = useState("");
   const [paymentAudit, setPaymentAudit] = useState<{ actualAmount: number; expectedAmount: number; difference: number; txHash?: string } | null>(null);
   const [retryCooldown, setRetryCooldown] = useState<number>(0);
   const [isFailedExhausted, setIsFailedExhausted] = useState<boolean>(false);
+  const [copied, setCopied] = useState(false);
+  const [copiedAddress, setCopiedAddress] = useState(false);
 
   // ─── Persistent Crypto Cooldown across tabs, pages and reloads ──────────────
   useEffect(() => {
@@ -148,32 +143,82 @@ export default function Home() {
     };
   }, []);
 
-  const [selectedProductForBuy, setSelectedProductForBuy] = useState<Product | null>(null);
-  const [isCheckoutFromCart, setIsCheckoutFromCart] = useState(false);
-  const [phoneError, setPhoneError] = useState("");
-  const [toastMessage, setToastMessage] = useState("");
+  const myBinancePayId = "1082962624";
+
+  // Fetch Settings & Product
+  useEffect(() => {
+    if (isCartOpen || isPaymentModalOpen || isVodafoneModalOpen || isBinanceModalOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isCartOpen, isPaymentModalOpen, isVodafoneModalOpen, isBinanceModalOpen]);
 
   useEffect(() => {
     async function loadData() {
       try {
-        const [productsRes, settingsRes] = await Promise.all([
-          fetch("/api/public/products"),
-          fetch("/api/public/settings"),
-        ]);
-        if (productsRes.ok) {
-          const productData = await productsRes.json();
-          setProducts(productData);
-        }
+        setLoading(true);
+        // Load Settings
+        const settingsRes = await fetch("/api/public/settings");
         if (settingsRes.ok) {
-          const settingsData = await settingsRes.json();
-          setSettings((prev) => ({ ...prev, ...settingsData }));
+          const s = await settingsRes.json();
+          setSettings((prev) => ({ ...prev, ...s }));
         }
-      } catch (error) {
-        console.error("Failed to load public data:", error);
+
+        // Load Product
+        const prodRes = await fetch(`/api/public/products/${productId}`);
+        if (prodRes.ok) {
+          const p = await prodRes.json();
+          setProduct(p);
+        } else {
+          // Fallback to all products
+          const allRes = await fetch("/api/public/products");
+          if (allRes.ok) {
+            const all: Product[] = await allRes.json();
+            setAllProducts(all);
+            const found = all.find((item) => item.id === productId || item.sku === productId);
+            if (found) {
+              setProduct(found);
+            } else {
+              setError("المنتج غير موجود أو تم إخفاؤه.");
+            }
+          } else {
+            setError("تعذر العثور على المنتج.");
+          }
+        }
+
+        // Load All Products for Related section
+        const allRes = await fetch("/api/public/products");
+        if (allRes.ok) {
+          const all: Product[] = await allRes.json();
+          setAllProducts(all);
+        }
+
+        // Load Crypto addresses
+        const cryptoRes = await fetch("/api/public/crypto/addresses");
+        if (cryptoRes.ok) {
+          const cData = await cryptoRes.json();
+          if (cData.addresses && cData.addresses.length > 0) {
+            setCryptoAddresses(cData.addresses);
+            const nonTrx = cData.addresses.find((a: any) => a.networkId !== "TRX");
+            setSelectedNetwork(nonTrx ? nonTrx.networkId : "PAY_ID");
+          }
+        }
+      } catch (err: any) {
+        console.error(err);
+        setError("حدث خطأ أثناء تحميل بيانات المنتج.");
+      } finally {
+        setLoading(false);
       }
     }
-    loadData();
-  }, []);
+
+    if (productId) {
+      loadData();
+    }
+  }, [productId]);
 
   const cartLoaded = useRef(false);
   const cartSaveMounted = useRef(false);
@@ -246,35 +291,75 @@ export default function Home() {
     }
   }, [cart]);
 
-  const cartCount = useMemo(() => Object.values(cart).reduce((a, b) => a + b, 0), [cart]);
-  
-  const cartTotal = useMemo(() =>
-    Object.entries(cart).reduce((sum, [id, qty]) => {
-      const p = products.find((p) => p.id === id);
-      return sum + (p && typeof p.price === 'number' ? p.price * qty : 0);
-    }, 0),
-  [cart, products]);
-
-  const binanceUsdAmount = useMemo(() => {
-    const rate = Number(settings.usdt_rate) > 0 ? Number(settings.usdt_rate) : 50;
-    const totalLocal = isCheckoutFromCart ? cartTotal : (selectedProductForBuy ? Number(selectedProductForBuy.price || 0) : 0);
-    const converted = totalLocal / rate;
-    return Math.max(0.01, Number(converted.toFixed(2)));
-  }, [isCheckoutFromCart, cartTotal, selectedProductForBuy, settings.usdt_rate]);
-
   function showToast(msg: string) {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(""), 3500);
   }
 
   function addToCart(id: string) {
-    setCart((c) => ({ ...c, [id]: (c[id] ?? 0) + 1 }));
+    setCart((prev) => ({ ...prev, [id]: (prev[id] ?? 0) + 1 }));
     showToast("تمت إضافة المنتج إلى سلة المشتريات بنجاح! 🛍️");
   }
-  function decreaseQuantity(id: string) { setCart((c) => { const qty = c[id]; if (!qty) return c; if (qty === 1) { const newCart = { ...c }; delete newCart[id]; return newCart; } return { ...c, [id]: qty - 1 }; }); }
-  function removeFromCart(id: string) { setCart((c) => { const newCart = { ...c }; delete newCart[id]; return newCart; }); }
-  function handleDirectBuy(product: Product) { setSelectedProductForBuy(product); setIsCheckoutFromCart(false); setIsPaymentModalOpen(true); }
-  function handleCartCheckoutClick() { if (cartCount === 0) return; setIsCheckoutFromCart(true); setSelectedProductForBuy(null); setIsPaymentModalOpen(true); setIsCartOpen(false); }
+
+  function decreaseQuantity(id: string) {
+    setCart((c) => {
+      const qty = c[id];
+      if (!qty) return c;
+      if (qty === 1) {
+        const newCart = { ...c };
+        delete newCart[id];
+        return newCart;
+      }
+      return { ...c, [id]: qty - 1 };
+    });
+  }
+
+  function removeFromCart(id: string) {
+    setCart((c) => {
+      const newCart = { ...c };
+      delete newCart[id];
+      return newCart;
+    });
+  }
+
+  function handleDirectBuy() {
+    setIsCheckoutFromCart(false);
+    setIsPaymentModalOpen(true);
+  }
+
+  function handleCartCheckoutClick() {
+    if (cartCount === 0) return;
+    setIsCheckoutFromCart(true);
+    setIsPaymentModalOpen(true);
+    setIsCartOpen(false);
+  }
+
+  const cartCount = useMemo(() => Object.values(cart).reduce((a, b) => a + b, 0), [cart]);
+
+  const cartTotal = useMemo(() =>
+    Object.entries(cart).reduce((sum, [id, qty]) => {
+      const p = allProducts.find((item) => item.id === id) || (product?.id === id ? product : null);
+      const priceNum = p ? (typeof p.price === "number" ? p.price : parseFloat(p.price as string) || 0) : 0;
+      return sum + priceNum * qty;
+    }, 0),
+  [cart, allProducts, product]);
+
+  const activeCryptoAddress = useMemo(() => {
+    const found = cryptoAddresses.find((a) => a.networkId === selectedNetwork)?.address;
+    if (found) return found;
+    if (selectedNetwork === "BSC") return "0xfa90bd46019435b0aa3d0bc69ee2bf5a432e2806";
+    if (selectedNetwork === "APT") return "0xa236707d87a33bed07e75aed59471c605c22846ddd1f464e9ee9910383dbf528";
+    return "TN9kZMYS53JbuHQbsGPGDvJXD4gUhPVZi7";
+  }, [cryptoAddresses, selectedNetwork]);
+
+  const binanceUsdAmount = useMemo(() => {
+    const rate = Number(settings.usdt_rate) > 0 ? Number(settings.usdt_rate) : 50;
+    const totalLocal = isCheckoutFromCart
+      ? cartTotal
+      : (product ? (typeof product.price === "number" ? product.price : parseFloat(product.price as string) || 0) : 0);
+    const converted = totalLocal / rate;
+    return Math.max(0.01, Number(converted.toFixed(2)));
+  }, [isCheckoutFromCart, cartTotal, product, settings.usdt_rate]);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     if (e.target.files && e.target.files[0]) {
@@ -282,132 +367,6 @@ export default function Home() {
       setFileName(e.target.files[0].name);
     }
   }
-
-  async function payViaWhatsApp() {
-    if (!senderPhone.trim()) { 
-      setPhoneError("يرجى إدخال رقم هاتفك المحول منه أولاً للمتابعة!"); 
-      return; 
-    }
-    setPhoneError("");
-    setIsUploadingImage(true);
-
-    let amount = 0;
-    let prodName = "";
-    let prodId = "";
-
-    if (isCheckoutFromCart) {
-      amount = cartTotal;
-      prodId = "cart";
-      prodName = Object.entries(cart)
-        .map(([id, qty]) => {
-          const p = products.find(x => x.id === id);
-          return p ? `${p.name} (x${qty})` : "";
-        })
-        .filter(Boolean)
-        .join(" + ");
-    } else if (selectedProductForBuy) {
-      amount = Number(selectedProductForBuy.price) || 0;
-      prodId = String(selectedProductForBuy.id || selectedProductForBuy.sku || "");
-      prodName = selectedProductForBuy.name;
-    }
-
-    let receiptUrl = "";
-
-    try {
-      const submitData = new FormData();
-      submitData.append("senderPhone", senderPhone.trim());
-      submitData.append("customerName", "عميل فودافون كاش / إنستاباي");
-      submitData.append("amount", String(amount));
-      submitData.append("currency", settings.currency || "ج.م");
-      submitData.append("productId", prodId);
-      submitData.append("productName", prodName);
-      submitData.append("paymentMethod", transferMethod);
-      if (receiptFile) {
-        submitData.append("receiptFile", receiptFile);
-      }
-
-      const res = await fetch("/api/public/instapay/submit", {
-        method: "POST",
-        body: submitData,
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data.receiptUrl) {
-          receiptUrl = typeof window !== "undefined" ? `${window.location.origin}${data.receiptUrl}` : data.receiptUrl;
-        }
-      }
-    } catch (err) {
-      console.error("Failed to submit receipt to store database", err);
-    } finally {
-      setIsUploadingImage(false);
-    }
-
-    const methodLabel = transferMethod === "instapay" ? "⚡ إنستاباي (InstaPay)" : "🔴 فودافون كاش (Vodafone Cash)";
-    let orderText = `السلام عليكم ورحمة الله وبركاتة\nأرغب في تأكيد طلب شراء:\n`;
-    if (isCheckoutFromCart) {
-      Object.entries(cart).forEach(([id, qty]) => {
-        const p = products.find(x => x.id === id);
-        if (p) orderText += `- ${p.name} x${qty}\n`;
-      });
-      orderText += `\nالإجمالي الكلي:${cartTotal} ${settings.currency || "ج.م"}\nطريقة التحويل:${methodLabel}\nرقم الهاتف المحول منه:${senderPhone}`;
-    } else if (selectedProductForBuy) {
-      orderText += `-${selectedProductForBuy.name}\nالسعر:${selectedProductForBuy.price} ${settings.currency || "ج.م"}\nطريقة التحويل:${methodLabel}\nرقم الهاتف المحول منه:${senderPhone}`;
-    }
-
-    if (receiptUrl) {
-      orderText += `\n\nرابط إيصال التحويل المرفق:\n${receiptUrl}`;
-    }
-
-    window.open(`${settings.contact_whatsapp || "https://wa.me/201158413075?text="}${encodeURIComponent(orderText)}`, "_blank");
-    setIsVodafoneModalOpen(false);
-    setIsPaymentModalOpen(false);
-  }
-
-  const [cryptoAddresses, setCryptoAddresses] = useState<Array<{ networkId: string; networkName: string; address: string; tag: string; isPopular?: boolean }>>([]);
-  const [selectedNetwork, setSelectedNetwork] = useState<string>("PAY_ID");
-  const [currentCryptoOrder, setCurrentCryptoOrder] = useState<any>(null);
-  const [verificationError, setVerificationError] = useState("");
-  const [copiedAddress, setCopiedAddress] = useState(false);
-
-  useEffect(() => {
-    if (isCartOpen || isPaymentModalOpen || isVodafoneModalOpen || isBinanceModalOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [isCartOpen, isPaymentModalOpen, isVodafoneModalOpen, isBinanceModalOpen]);
-
-  useEffect(() => {
-    async function fetchCryptoAddresses() {
-      try {
-        const res = await fetch("/api/public/crypto/addresses");
-        if (res.ok) {
-          const data = await res.json();
-          if (data.addresses && data.addresses.length > 0) {
-            setCryptoAddresses(data.addresses);
-            // Default to PAY_ID (Binance Pay), fallback to first non-TRX network
-            const firstNonTrx = data.addresses.find((a: any) => a.networkId !== "TRX");
-            setSelectedNetwork(firstNonTrx ? firstNonTrx.networkId : "PAY_ID");
-          }
-        }
-      } catch (err) {
-        console.error("Failed to load crypto addresses", err);
-      }
-    }
-    fetchCryptoAddresses();
-  }, []);
-
-  const activeCryptoAddress = useMemo(() => {
-    const found = cryptoAddresses.find(a => a.networkId === selectedNetwork)?.address;
-    if (found) return found;
-    if (selectedNetwork === "BSC") return "0xfa90bd46019435b0aa3d0bc69ee2bf5a432e2806";
-    if (selectedNetwork === "APT") return "0xa236707d87a33bed07e75aed59471c605c22846ddd1f464e9ee9910383dbf528";
-    return "TN9kZMYS53JbuHQbsGPGDvJXD4gUhPVZi7";
-  }, [cryptoAddresses, selectedNetwork]);
 
   function openVodafoneModal() {
     setIsPaymentModalOpen(false);
@@ -473,31 +432,29 @@ export default function Home() {
       }
     } catch {}
 
+    let pId = product?.id || "product";
+    let pName = product?.name || "اشتراك AI";
+    if (isCheckoutFromCart) {
+      pId = "cart";
+      pName = Object.entries(cart)
+        .map(([id, qty]) => {
+          const p = allProducts.find((x) => x.id === id) || (product?.id === id ? product : null);
+          return p ? `${p.name} (x${qty})` : "";
+        })
+        .filter(Boolean)
+        .join(" + ");
+    }
+
     // Create a pending crypto order in backend
     try {
-      let prodName = selectedProductForBuy?.name || "اشتراك AI";
-      let prodId = selectedProductForBuy?.id || "product";
-
-      if (isCheckoutFromCart) {
-        prodId = "cart";
-        const items = Object.entries(cart)
-          .map(([id, qty]) => {
-            const p = products.find((x) => x.id === id);
-            return p ? `${p.name} (x${qty})` : "";
-          })
-          .filter(Boolean)
-          .join(" + ");
-        prodName = items || `سلة مشتريات (${cartCount} منتجات)`;
-      }
-
       const res = await fetch("/api/public/crypto/create-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           customerName: "عميل المتجر",
           customerPhone: senderPhone || "",
-          productId: prodId,
-          productName: prodName,
+          productId: pId,
+          productName: pName,
           amount: binanceUsdAmount,
           currency: "USDT",
           network: selectedNetwork,
@@ -513,9 +470,17 @@ export default function Home() {
     }
   }
 
-  const myBinancePayId = "1082962624";
-  function copyBinanceId() { navigator.clipboard.writeText(myBinancePayId); setCopied(true); setTimeout(() => setCopied(false), 2500); }
-  function copyWalletAddress() { navigator.clipboard.writeText(activeCryptoAddress); setCopiedAddress(true); setTimeout(() => setCopiedAddress(false), 2500); }
+  function copyBinanceId() {
+    navigator.clipboard.writeText(myBinancePayId);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+  }
+
+  function copyWalletAddress() {
+    navigator.clipboard.writeText(activeCryptoAddress);
+    setCopiedAddress(true);
+    setTimeout(() => setCopiedAddress(false), 2500);
+  }
 
   async function verifyBinancePayment() {
     if (retryCooldown > 0) return;
@@ -597,12 +562,115 @@ export default function Home() {
     }
   }
 
+  async function payViaWhatsApp() {
+    if (!senderPhone.trim()) {
+      setPhoneError("يرجى إدخال رقم هاتفك المحول منه أولاً للمتابعة!");
+      return;
+    }
+    setPhoneError("");
+
+    setIsUploadingImage(true);
+
+    let amount = 0;
+    let prodId = "";
+    let prodName = "";
+
+    if (isCheckoutFromCart) {
+      amount = cartTotal;
+      prodId = "cart";
+      prodName = Object.entries(cart)
+        .map(([id, qty]) => {
+          const p = allProducts.find((x) => x.id === id) || (product?.id === id ? product : null);
+          return p ? `${p.name} (x${qty})` : "";
+        })
+        .filter(Boolean)
+        .join(" + ");
+    } else if (product) {
+      amount = Number(product.price) || 0;
+      prodId = String(product.id || product.sku || productId);
+      prodName = product.name;
+    }
+
+    let receiptUrl = "";
+
+    try {
+      const submitData = new FormData();
+      submitData.append("senderPhone", senderPhone.trim());
+      submitData.append("customerName", "عميل فودافون كاش / إنستاباي");
+      submitData.append("amount", String(amount));
+      submitData.append("currency", settings.currency || "ج.م");
+      submitData.append("productId", prodId);
+      submitData.append("productName", prodName);
+      submitData.append("paymentMethod", transferMethod);
+      if (receiptFile) {
+        submitData.append("receiptFile", receiptFile);
+      }
+
+      const res = await fetch("/api/public/instapay/submit", {
+        method: "POST",
+        body: submitData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.receiptUrl) {
+          receiptUrl = typeof window !== "undefined" ? `${window.location.origin}${data.receiptUrl}` : data.receiptUrl;
+        }
+      }
+    } catch (err) {
+      console.error("Failed to submit receipt to store database", err);
+    } finally {
+      setIsUploadingImage(false);
+    }
+
+    const methodLabel = transferMethod === "instapay" ? "⚡ إنستاباي (InstaPay)" : "🔴 فودافون كاش (Vodafone Cash)";
+    let orderText = `السلام عليكم ورحمة الله وبركاته\nأرغب في تأكيد طلب شراء:\n`;
+    if (isCheckoutFromCart) {
+      Object.entries(cart).forEach(([id, qty]) => {
+        const p = allProducts.find((x) => x.id === id) || (product?.id === id ? product : null);
+        if (p) orderText += `- ${p.name} x${qty}\n`;
+      });
+      orderText += `\nالإجمالي الكلي: ${cartTotal} ${settings.currency || "ج.م"}\nطريقة التحويل: ${methodLabel}\nرقم الهاتف المحول منه: ${senderPhone}`;
+    } else if (product) {
+      orderText += `- ${product.name}\nالسعر: ${product.price} ${settings.currency || "ج.م"}\nطريقة التحويل: ${methodLabel}\nرقم الهاتف المحول منه: ${senderPhone}`;
+    }
+
+    if (receiptUrl) {
+      orderText += `\n\nرابط إيصال التحويل المرفق:\n${receiptUrl}`;
+    }
+
+    window.open(`${settings.contact_whatsapp || "https://wa.me/201158413075?text="}${encodeURIComponent(orderText)}`, "_blank");
+    setIsVodafoneModalOpen(false);
+    setIsPaymentModalOpen(false);
+  }
+
+  function handleDirectWhatsApp() {
+    if (!product) return;
+    const text = `مرحباً، أرغب في الاستفسار وشراء: ${product.name} بسعر ${product.price} ${settings.currency || "ج.م"}`;
+    window.open(`${settings.contact_whatsapp || "https://wa.me/201158413075?text="}${encodeURIComponent(text)}`, "_blank");
+  }
+
+  const relatedProducts = useMemo(() => {
+    return allProducts.filter((p) => p.id !== productId).slice(0, 4);
+  }, [allProducts, productId]);
+
+  const totalSales = (Number(product?.fake_sales_count) || 0) + (Number(product?.sales_count) || 0);
+  const isOutOfStock = Boolean(product && product.stock !== undefined && product.stock !== null && Number(product.stock) <= 0);
+
+  const longDescContent = useMemo(() => {
+    const text = product?.long_description || product?.description || product?.detail || "";
+    if (!text.trim()) {
+      return ["لا توجد تفاصيل إضافية مسجلة لهذا المنتج حالياً."];
+    }
+    return text.split("\n").map((l) => l.trim()).filter(Boolean);
+  }, [product]);
+
   const floatingButtonStyle = {
     position: "fixed" as const, right: "20px", borderRadius: "50%", width: "65px", height: "65px", display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid rgba(255,255,255,0.2)", cursor: "pointer", zIndex: 50, boxShadow: "0px 15px 25px rgba(0,0,0,0.8), inset 0px 5px 10px rgba(255,255,255,0.4), inset 0px -5px 10px rgba(0,0,0,0.5)", transition: "transform 0.2s ease"
   };
 
   return (
-    <main className="min-h-screen relative pb-20 bg-[#0a0c10] text-white">
+    <div className="min-h-screen bg-[#0a0c10] text-white font-sans selection:bg-[#E8A33D] selection:text-[#10131A]" dir="rtl">
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[200] flex items-center gap-2 rounded-2xl border border-[#E8A33D]/60 bg-[#161a25]/95 px-5 py-3 text-sm font-bold text-white shadow-[0_10px_30px_rgba(0,0,0,0.8)] backdrop-blur-xl animate-bounce">
@@ -610,170 +678,353 @@ export default function Home() {
           <span>{toastMessage}</span>
         </div>
       )}
-      {/* هيدر */}
-      <header className="relative overflow-hidden border-b border-white/10 flex flex-col items-center justify-center py-16 bg-gradient-to-b from-[#161a27] to-[#0a0c10] shadow-[0_10px_30px_rgba(0,0,0,0.8)]">
-        <div className="absolute inset-0 -z-10 opacity-[0.08]">
-          <div className="h-full w-full" style={{ backgroundImage: "repeating-linear-gradient(-45deg, #E8A33D 0, #E8A33D 2px, transparent 2px, transparent 25px)" }} />
-        </div>
-        <div className="mx-auto max-w-5xl px-6 text-center flex flex-col items-center">
-          <h2 className="mb-3 font-display text-3xl tracking-[0.2em] text-[#E8A33D] font-bold drop-shadow-[0_2px_10px_rgba(232,163,61,0.5)]">{settings.website_name || "AI STORE"}</h2>
-          <h1 className="font-display text-4xl font-extrabold leading-tight text-white sm:text-5xl drop-shadow-[0_5px_15px_rgba(0,0,0,0.9)]">{settings.hero_title}</h1>
-          <p className="mt-4 max-w-3xl text-base text-white/70">{settings.hero_description}</p>
-          <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-            <a href={settings.hero_button_url} className="rounded-3xl bg-gradient-to-r from-[#E8A33D] to-[#d69230] px-7 py-4 text-sm font-extrabold text-[#10131A] transition hover:brightness-110">{settings.hero_button_text}</a>
-            <a href={settings.contact_whatsapp} className="rounded-3xl border border-white/15 bg-white/5 px-7 py-4 text-sm font-bold text-white transition hover:bg-white/10">Contact WhatsApp</a>
+
+      {/* Header */}
+      <header className="sticky top-0 z-40 border-b border-white/10 bg-[#0a0c10]/85 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6">
+          <Link href="/" className="flex items-center gap-3 group">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-tr from-[#E8A33D] to-[#ffcc70] text-[#10131A] font-black text-xl shadow-[0_0_20px_rgba(232,163,61,0.5)] transition-transform group-hover:scale-105">
+              ⚡
+            </div>
+            <div>
+              <span className="font-display text-lg sm:text-xl font-extrabold tracking-wide text-white group-hover:text-[#E8A33D] transition">
+                {settings.website_name || "AI STORE"}
+              </span>
+              <span className="block text-[10px] text-white/50">متجر الاشتراكات والذكاء الاصطناعي</span>
+            </div>
+          </Link>
+
+          <div className="flex items-center gap-2.5 sm:gap-4">
+            <Link
+              href="/"
+              className="flex items-center gap-1.5 rounded-2xl border border-white/15 bg-white/5 px-3.5 py-2 text-xs sm:text-sm font-bold text-white/80 transition hover:bg-white/10 hover:text-white"
+            >
+              <span>←</span>
+              <span>الرئيسية</span>
+            </Link>
+
+            <button
+              onClick={() => setIsCartOpen(true)}
+              className="relative flex items-center gap-2 rounded-2xl border border-[#E8A33D]/40 bg-[#1a1f2c] px-4 py-2 text-xs sm:text-sm font-extrabold text-[#E8A33D] transition hover:bg-[#E8A33D]/20 shadow-[0_0_15px_rgba(232,163,61,0.2)]"
+            >
+              <span>السلة</span>
+              <span>🛍️</span>
+              {cartCount > 0 && (
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#E8A33D] text-[11px] font-black text-[#10131A]">
+                  {cartCount}
+                </span>
+              )}
+            </button>
           </div>
         </div>
       </header>
 
-      {/* المنتجات */}
-      <section className="mx-auto max-w-7xl px-4 sm:px-6 py-14">
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-          {products.map((p) => {
-            const isOutOfStock = p.stock !== undefined && p.stock !== null && Number(p.stock) <= 0;
-            return (
-              <article 
-                key={p.id} 
-                className="flex flex-col overflow-hidden rounded-3xl border border-white/15 bg-gradient-to-b from-[#1a1f2c] to-[#11141d] shadow-[0_15px_35px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.1)] transition-all duration-300 hover:scale-[1.02] hover:border-[#E8A33D]/60 hover:shadow-[0_20px_40px_rgba(232,163,61,0.2)]"
-              >
-                <Link href={`/products/${p.id}`} className="h-48 sm:h-52 w-full relative overflow-hidden bg-black flex items-center justify-center p-4 group">
-                  {/* Top floating Sales Count indicator badge */}
-                  <div className="absolute top-3.5 right-3.5 z-10 inline-flex items-center rounded-full bg-black/85 backdrop-blur-md border border-white/20 px-3.5 py-1.5 sm:px-3 sm:py-1 text-xs font-bold text-white shadow-[0_6px_20px_rgba(0,0,0,0.9)]">
-                    <span dir="rtl">المبيعات <strong className="text-[#E8A33D] font-mono text-sm font-black">{(Number(p.fake_sales_count) || 0) + (Number(p.sales_count) || 0)}</strong></span>
-                  </div>
-
-                  {/* Out of stock badge */}
-                  {isOutOfStock && (
-                    <div className="absolute top-3.5 left-3.5 z-10 inline-flex items-center rounded-full bg-rose-600/90 backdrop-blur-md border border-rose-400/50 px-3 py-1 text-xs font-black text-white shadow-lg">
-                      نفد من المخزون
-                    </div>
-                  )}
-
-                  <img 
-                    src={p.image} 
-                    alt={p.name} 
-                    className={`h-full w-full object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,0.9)] transition-transform duration-500 group-hover:scale-105 ${isOutOfStock ? "opacity-60 grayscale-[30%]" : ""}`} 
-                    onError={(e) => { e.currentTarget.style.display = 'none'; }} 
-                  />
-                </Link>
-                <div className="flex flex-col items-center text-center gap-2 p-5 pb-3">
-                  <Link href={`/products/${p.id}`} className="group hover:text-[#E8A33D] transition">
-                    <h2 className="font-display text-xl sm:text-2xl font-bold text-white drop-shadow-md group-hover:text-[#E8A33D] transition">{p.name}</h2>
-                  </Link>
-                  <div className="font-display text-lg sm:text-xl font-extrabold text-[#E8A33D] drop-shadow-[0_2px_8px_rgba(232,163,61,0.4)]">
-                    {formatPrice(p.price, settings.currency, Number(settings.usdt_rate))}
-                  </div>
-                  <p className="mt-1 text-sm sm:text-[15px] font-medium text-white/85 line-clamp-2 leading-relaxed">{p.detail}</p>
-                  <Link
-                    href={`/products/${p.id}`}
-                    className="mt-1 inline-flex items-center gap-1.5 text-xs font-extrabold text-[#E8A33D] hover:underline hover:text-[#ffcc70] transition"
-                  >
-                    <span>عرض التفاصيل الكاملة</span>
-                    <span className="text-xs">←</span>
-                  </Link>
-                </div>
-                {isOutOfStock ? (
-                  <div className="mt-auto p-5 pt-2">
-                    <button 
-                      disabled 
-                      className="w-full rounded-2xl bg-white/10 border border-white/10 py-3 font-display text-sm font-bold text-white/40 cursor-not-allowed text-center shadow-inner"
-                    >
-                      نفد من المخزون حالياً
-                    </button>
-                  </div>
-                ) : (
-                  <div className="mt-auto grid grid-cols-2 gap-2.5 p-5 pt-2">
-                    <button 
-                      onClick={() => handleDirectBuy(p)} 
-                      className="rounded-2xl bg-gradient-to-r from-[#E8A33D] to-[#d69230] py-3 font-display text-sm font-extrabold text-[#10131A] transition-all hover:brightness-110 active:scale-95 shadow-[0_5px_15px_rgba(232,163,61,0.4),inset_0_2px_3px_rgba(255,255,255,0.4)]"
-                    >
-                      شراء
-                    </button>
-                    <button 
-                      onClick={() => addToCart(p.id)} 
-                      className="rounded-2xl border border-[#E8A33D]/60 bg-[#161a25] py-3 font-display text-sm font-bold text-[#E8A33D] transition-all hover:bg-[#E8A33D]/20 active:scale-95 shadow-[0_5px_15px_rgba(0,0,0,0.5),inset_0_1px_2px_rgba(255,255,255,0.1)]"
-                    >
-                      إضافة للسلة
-                    </button>
-                  </div>
-                )}
-              </article>
-            );
-          })}
+      {/* Main Content */}
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-12">
+        {/* Breadcrumb Navigation */}
+        <div className="mb-6 flex flex-wrap items-center gap-2 text-xs sm:text-sm text-white/50">
+          <Link href="/" className="hover:text-[#E8A33D] transition">الرئيسية</Link>
+          <span>/</span>
+          <span>{product?.category_name || "المنتجات"}</span>
+          <span>/</span>
+          <span className="text-[#E8A33D] font-bold">{product?.name || "تفاصيل المنتج"}</span>
         </div>
-      </section>
 
-      {/* سلة المشتريات (بعد تعديل الأسعار) */}
-      {isCartOpen && (
-        <div 
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md overscroll-contain"
-          onClick={() => setIsCartOpen(false)}
-        >
-          <div 
-            className="bg-gradient-to-b from-[#181d2a] to-[#10131d] border border-white/20 rounded-3xl w-full max-w-md overflow-hidden shadow-[0_25px_50px_rgba(0,0,0,0.9)] flex flex-col max-h-[85vh] overscroll-contain"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between p-6 border-b border-white/10 bg-black/30">
-              <h3 className="text-2xl font-bold text-white drop-shadow">سلة المشتريات</h3>
-              <button onClick={() => setIsCartOpen(false)} className="text-white/60 hover:text-white transition p-2 bg-white/5 rounded-full"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
-            </div>
-            
-            <div className="p-6 overflow-y-auto flex-1 space-y-4 overscroll-contain touch-pan-y">
-              {cartCount === 0 ? <div className="text-center text-white/50 py-12 text-lg">السلة فارغة حالياً</div> : 
-                <div className="flex flex-col gap-4">
-                  {Object.entries(cart).map(([id, qty]) => {
-                    const p = products.find(x => x.id === id);
-                    if (!p) return null;
-                    return (
-                      <div key={id} className="flex flex-col bg-white/[0.04] p-4 rounded-2xl border border-white/10 shadow-[0_8px_20px_rgba(0,0,0,0.4)]">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-center gap-3">
-                            <img src={p.image} alt={p.name} className="w-12 h-12 object-contain bg-black/60 rounded-xl p-1 border border-white/10" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-                            <div>
-                              <h4 className="text-white font-bold text-base">{p.name}</h4>
-                              <div className="text-[#E8A33D] text-xs font-semibold mt-1">
-                                {formatPrice(p.price, settings.currency, Number(settings.usdt_rate))}
-                              </div>
-                            </div>
-                          </div>
-                          <button onClick={() => removeFromCart(id)} className="text-red-400 p-2 hover:bg-red-500/10 rounded-xl transition"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
+        {loading ? (
+          <div className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-3xl border border-white/10 bg-white/[0.02] p-12">
+            <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#E8A33D] border-t-transparent"></div>
+            <p className="text-sm font-semibold text-white/60">جاري تحميل تفاصيل المنتج...</p>
+          </div>
+        ) : error || !product ? (
+          <div className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-3xl border border-white/10 bg-black/40 p-12 text-center">
+            <span className="text-4xl">⚠️</span>
+            <h2 className="text-xl font-bold text-white">{error || "المنتج غير متوفر"}</h2>
+            <p className="text-sm text-white/60">ربما تم حذف هذا المنتج أو أن الرابط غير صحيح.</p>
+            <Link
+              href="/"
+              className="mt-2 rounded-2xl bg-gradient-to-r from-[#E8A33D] to-[#d69230] px-6 py-2.5 text-sm font-extrabold text-[#10131A] shadow-lg hover:brightness-110"
+            >
+              العودة للمتجر الرئيسي
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-12">
+                {/* Product Top Grid */}
+                <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
+                  {/* Product Visual Box */}
+                  <div className="lg:col-span-5 flex flex-col items-center">
+                    <div className="relative w-full overflow-hidden rounded-3xl border border-white/15 bg-gradient-to-b from-[#1a1f2c] to-[#11141d] p-6 shadow-[0_20px_50px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.1)] group">
+                      {/* Top Floating Sales Badge */}
+                      <div className="absolute top-4 right-4 z-10 inline-flex items-center rounded-full bg-black/85 backdrop-blur-md border border-white/20 px-3.5 py-1.5 sm:px-3 sm:py-1 text-xs font-bold text-white shadow-[0_6px_20px_rgba(0,0,0,0.9)]">
+                        <span dir="rtl">المبيعات <strong className="text-[#E8A33D] font-mono text-sm font-black">{totalSales}</strong></span>
+                      </div>
+
+                      {/* Out of Stock Badge */}
+                      {isOutOfStock ? (
+                        <div className="absolute top-4 left-4 z-10 rounded-full bg-rose-600/90 border border-rose-400/50 px-3.5 py-1 text-xs font-black text-white shadow-lg">
+                          نفد من المخزون
                         </div>
-                        <div className="flex items-center justify-between mt-4 pt-3 border-t border-white/5">
-                          <div className="flex items-center bg-black/60 rounded-xl p-1 border border-white/10 shadow-inner">
-                            <button onClick={() => decreaseQuantity(id)} className="w-9 h-9 text-white font-bold hover:text-[#E8A33D] transition">-</button>
-                            <span className="w-10 text-center text-white font-extrabold">{qty}</span>
-                            <button onClick={() => addToCart(id)} className="w-9 h-9 text-white font-bold hover:text-[#E8A33D] transition">+</button>
+                      ) : product.discount_enabled ? (
+                        <div className="absolute top-4 left-4 z-10 rounded-full bg-emerald-500/20 border border-emerald-500/40 px-3 py-1 text-xs font-black text-emerald-300">
+                          -{product.discount_percentage}% خصم
+                        </div>
+                      ) : null}
+
+                      <div className="flex h-72 sm:h-96 w-full items-center justify-center bg-black/50 rounded-2xl p-4 overflow-hidden">
+                        <img
+                          src={product.image || "/p3.png"}
+                          alt={product.name}
+                          className={`h-full w-full object-contain drop-shadow-[0_15px_30px_rgba(0,0,0,0.9)] transition-transform duration-500 group-hover:scale-105 ${isOutOfStock ? "opacity-60 grayscale-[30%]" : ""}`}
+                          onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                        />
+                      </div>
+
+                      <div className="mt-4 flex items-center justify-between border-t border-white/10 pt-3 text-xs">
+                        {isOutOfStock ? (
+                          <div className="flex items-center gap-2 text-rose-400 font-bold">
+                            <span className="relative flex h-2.5 w-2.5">
+                              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500"></span>
+                            </span>
+                            <span>غير متوفر حالياً (نفد من المخزون)</span>
                           </div>
-                          <div className="text-[#E8A33D] font-extrabold text-sm">
-                             {formatPrice(typeof p.price === 'number' ? p.price * qty : 0, settings.currency, Number(settings.usdt_rate))}
+                        ) : (
+                          <div className="flex items-center gap-2 text-emerald-400 font-bold">
+                            <span className="relative flex h-2.5 w-2.5">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                            </span>
+                            <span>متوفر في المخزون (تفعيل فوري)</span>
                           </div>
+                        )}
+                        <span className="font-mono text-white/40">SKU: {product.sku || product.id}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Product Info & Purchase Box */}
+                  <div className="lg:col-span-7 flex flex-col justify-between space-y-6">
+                    <div className="space-y-4">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="inline-flex items-center gap-1.5 rounded-xl bg-white/5 border border-white/10 px-3 py-1 text-xs font-bold text-white/70">
+                          <span>🗂️</span>
+                          <span>{product.category_name || "اشتراكات الذكاء الاصطناعي"}</span>
+                        </div>
+
+                        <div className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 text-xs font-bold text-emerald-400 shadow-sm">
+                          <span>🛡️</span>
+                          <span>الضمان: <strong className="text-white font-extrabold">{product.warranty || "ضمان كامل طوال مدة الاشتراك"}</strong></span>
                         </div>
                       </div>
-                    )
-                  })}
-                </div>
-              }
-            </div>
 
-            {cartCount > 0 && (
-              <div className="p-6 border-t border-white/10 bg-black/40 shadow-lg">
-                <div className="flex justify-between items-center mb-5">
-                  <span className="font-bold text-xl text-white">الإجمالي الكلي:</span>
-                  <div className="text-right flex flex-col items-end">
-                    <span className="font-extrabold text-2xl text-[#E8A33D] drop-shadow">
-                      {formatPrice(cartTotal, settings.currency, Number(settings.usdt_rate))}
-                    </span>
+                      <h1 className="font-display text-2xl sm:text-4xl font-extrabold text-white leading-tight drop-shadow-md">
+                        {product.name}
+                      </h1>
+
+                      {/* Price Box */}
+                      <div className="flex flex-wrap items-baseline gap-3 rounded-2xl border border-[#E8A33D]/30 bg-gradient-to-r from-[#1a1f2c] to-[#12151e] p-4 sm:p-5 shadow-inner">
+                        <div>
+                          <span className="text-xs text-white/60 block mb-0.5">السعر الرسمي للباقة:</span>
+                          <span className="font-display text-2xl sm:text-3xl font-black text-[#E8A33D] drop-shadow-[0_2px_10px_rgba(232,163,61,0.4)]">
+                            {formatPrice(product.price, settings.currency, Number(settings.usdt_rate))}
+                          </span>
+                        </div>
+                        {product.original_price ? (
+                          <div className="text-sm text-white/40 line-through font-mono">
+                            {product.original_price} {settings.currency}
+                          </div>
+                        ) : null}
+                      </div>
+
+                      {product.detail && (
+                        <p className="text-sm sm:text-base font-medium text-white/85 leading-relaxed bg-black/40 border border-white/10 rounded-2xl p-4">
+                          {product.detail}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Main Action Buttons */}
+                    {isOutOfStock ? (
+                      <div className="space-y-3 pt-2">
+                        <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 text-center">
+                          <p className="text-sm font-bold text-rose-300">عذراً، هذا المنتج نفد من المخزون حالياً.</p>
+                          <p className="text-xs text-white/60 mt-0.5">يمكنك مراسلتنا عبر الواتساب للاستفسار عن موعد التوفر القادم أو حجزه مسبقاً.</p>
+                        </div>
+
+                        <button
+                          onClick={handleDirectWhatsApp}
+                          className="w-full flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-600 to-emerald-700 py-4 text-base font-bold text-white shadow-lg transition hover:brightness-110 active:scale-95"
+                        >
+                          <span>💬</span>
+                          <span>طلب حجز وتوفير المنتج عبر واتساب</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-3 pt-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <button
+                            onClick={() => setIsPaymentModalOpen(true)}
+                            className="flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#E8A33D] to-[#d69230] py-4 font-display text-base font-black text-[#10131A] shadow-[0_10px_25px_rgba(232,163,61,0.4),inset_0_2px_3px_rgba(255,255,255,0.4)] transition hover:brightness-110 active:scale-95"
+                          >
+                            <span>⚡</span>
+                            <span>شراء فوري الآن</span>
+                          </button>
+
+                          <button
+                            onClick={() => addToCart(product.id)}
+                            className="flex items-center justify-center gap-2 rounded-2xl border border-[#E8A33D]/60 bg-[#161a25] py-4 font-display text-base font-bold text-[#E8A33D] shadow-[0_10px_20px_rgba(0,0,0,0.6)] transition hover:bg-[#E8A33D]/20 active:scale-95"
+                          >
+                            <span>🛍️</span>
+                            <span>إضافة إلى السلة</span>
+                          </button>
+                        </div>
+
+                        <button
+                          onClick={handleDirectWhatsApp}
+                          className="w-full flex items-center justify-center gap-2 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 py-3 text-sm font-bold text-emerald-400 transition hover:bg-emerald-500/20 active:scale-95"
+                        >
+                          <span>💬</span>
+                          <span>طلب واستفسار مباشر عبر واتساب</span>
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Guarantee Badges */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2">
+                      {[
+                        { icon: "⚡", title: "تسليم فوري", sub: "خلال دقائق" },
+                        { icon: "🛡️", title: product.warranty ? product.warranty : "ضمان كامل", sub: "ضمان معتمد رسمي" },
+                        { icon: "💬", title: "دعم 24/7", sub: "خدمة متواصلة" },
+                        { icon: "🔒", title: "دفع آمن", sub: "فودافون وبينانس" },
+                      ].map((g, idx) => (
+                        <div key={idx} className="flex flex-col items-center justify-center rounded-2xl border border-white/10 bg-black/40 p-3 text-center">
+                          <span className="text-lg">{g.icon}</span>
+                          <span className="text-xs font-bold text-white mt-1">{g.title}</span>
+                          <span className="text-[10px] text-white/50">{g.sub}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
-                <button onClick={handleCartCheckoutClick} className="w-full rounded-2xl bg-gradient-to-r from-[#E8A33D] to-[#d69230] py-4 font-display text-base font-extrabold text-[#10131A] transition-all hover:brightness-110 shadow-[0_10px_25px_rgba(232,163,61,0.4),inset_0_2px_4px_rgba(255,255,255,0.5)]">اختيار طريقة الدفع وإتمام الشراء</button>
+
+            {/* Long Description & Full Details */}
+            <section className="rounded-3xl border border-white/15 bg-gradient-to-b from-[#1a1f2c] to-[#11141d] p-6 sm:p-10 shadow-[0_20px_50px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.1)]">
+              <div className="flex items-center gap-3 border-b border-white/10 pb-4 mb-6">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#E8A33D]/20 text-[#E8A33D] font-bold text-lg border border-[#E8A33D]/30">
+                  📄
+                </div>
+                <div>
+                  <h2 className="font-display text-xl sm:text-2xl font-extrabold text-white">
+                    التفاصيل الكاملة والمميزات
+                  </h2>
+                  <p className="text-xs text-white/60">كل ما تحتاج معرفته عن هذا الاشتراك وطريقة استلامه</p>
+                </div>
               </div>
+
+              <div className="space-y-4 text-sm sm:text-base font-normal text-white/90 leading-relaxed font-sans">
+                {longDescContent.map((paragraph, index) => {
+                  const isBullet = paragraph.startsWith("-") || paragraph.startsWith("•") || paragraph.startsWith("*") || paragraph.startsWith("✨") || paragraph.startsWith("✓");
+                  return (
+                    <div
+                      key={index}
+                      className={isBullet ? "flex items-start gap-2.5 pr-2" : "py-1"}
+                    >
+                      {isBullet && <span className="text-[#E8A33D] font-bold shrink-0 mt-0.5">✦</span>}
+                      <p className={isBullet ? "text-white/95 font-medium" : "text-white/85"}>
+                        {isBullet ? paragraph.replace(/^[-•*✨✓]\s*/, "") : paragraph}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Instructions Callout */}
+              <div className="mt-8 rounded-2xl border border-white/10 bg-black/60 p-5 sm:p-6 space-y-3">
+                <h3 className="text-sm sm:text-base font-bold text-[#E8A33D] flex items-center gap-2">
+                  <span>💡</span>
+                  <span>كيف يتم التفعيل والاستلام؟</span>
+                </h3>
+                <ul className="space-y-2 text-xs sm:text-sm text-white/80">
+                  <li className="flex items-center gap-2">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#E8A33D]/20 text-[#E8A33D] font-bold text-[11px]">1</span>
+                    <span>اختر وسيلة الدفع المناسبة لك (فودافون كاش / إنستاباي أو بينانس باي عبر المعرف ID).</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#E8A33D]/20 text-[#E8A33D] font-bold text-[11px]">2</span>
+                    <span>أكمل عملية التحويل وسيتم التواصل معك مباشرة عبر الواتساب لإرسال بيانات الحساب والتفعيل.</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#E8A33D]/20 text-[#E8A33D] font-bold text-[11px]">3</span>
+                    <span>استمتع بالاشتراك مع دعم فني وضمان رسمي مستمر.</span>
+                  </li>
+                </ul>
+              </div>
+            </section>
+
+            {/* Related Products */}
+            {relatedProducts.length > 0 && (
+              <section className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="font-display text-xl sm:text-2xl font-extrabold text-white">منتجات قد تعجبك أيضاً</h2>
+                    <p className="text-xs text-white/60">باقات واشتراكات أخرى مميزة في المتجر</p>
+                  </div>
+                  <Link href="/" className="text-xs sm:text-sm font-bold text-[#E8A33D] hover:underline">
+                    عرض كل المنتجات ←
+                  </Link>
+                </div>
+
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+                  {relatedProducts.map((p) => {
+                    const isRelOutOfStock = p.stock !== undefined && p.stock !== null && Number(p.stock) <= 0;
+                    return (
+                      <article
+                        key={p.id}
+                        className="flex flex-col overflow-hidden rounded-3xl border border-white/15 bg-gradient-to-b from-[#1a1f2c] to-[#11141d] shadow-[0_15px_35px_rgba(0,0,0,0.8)] transition hover:scale-[1.02] hover:border-[#E8A33D]/60"
+                      >
+                        <Link href={`/products/${p.id}`} className="h-48 w-full relative overflow-hidden bg-black flex items-center justify-center p-4 group">
+                          <div className="absolute top-3.5 right-3.5 z-10 inline-flex items-center rounded-full bg-black/85 backdrop-blur-md border border-white/20 px-3 py-1 text-xs font-bold text-white">
+                            <span dir="rtl">المبيعات <strong className="text-[#E8A33D] font-mono font-black">{(Number(p.fake_sales_count) || 0) + (Number(p.sales_count) || 0)}</strong></span>
+                          </div>
+                          {isRelOutOfStock && (
+                            <div className="absolute top-3.5 left-3.5 z-10 inline-flex items-center rounded-full bg-rose-600/90 backdrop-blur-md border border-rose-400/50 px-2.5 py-0.5 text-[10px] font-black text-white shadow-lg">
+                              نفد
+                            </div>
+                          )}
+                          <img
+                            src={p.image || "/p3.png"}
+                            alt={p.name}
+                            className={`h-full w-full object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,0.9)] transition-transform group-hover:scale-105 ${isRelOutOfStock ? "opacity-60 grayscale-[30%]" : ""}`}
+                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                          />
+                        </Link>
+                        <div className="flex flex-col items-center text-center gap-2 p-5 pb-3">
+                          <Link href={`/products/${p.id}`}>
+                            <h3 className="font-display text-lg font-bold text-white hover:text-[#E8A33D] transition">{p.name}</h3>
+                          </Link>
+                          <div className="font-display text-base font-extrabold text-[#E8A33D]">
+                            {formatPrice(p.price, settings.currency, Number(settings.usdt_rate))}
+                          </div>
+                        </div>
+                        <div className="mt-auto p-4 pt-0">
+                          <Link
+                            href={`/products/${p.id}`}
+                            className="w-full flex items-center justify-center rounded-2xl border border-[#E8A33D]/50 bg-[#161a25] py-2.5 text-xs font-bold text-[#E8A33D] hover:bg-[#E8A33D]/20 transition"
+                          >
+                            عرض التفاصيل الكاملة
+                          </Link>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
             )}
           </div>
-        </div>
-      )}
+        )}
+      </main>
 
-      {/* نافذة اختيار طرق الدفع (بعد تعديل الأزرار للموبايل) */}
-      {isPaymentModalOpen && (
+      {/* نافذة اختيار طرق الدفع (مطابقة تماماً للصفحة الرئيسية) */}
+      {isPaymentModalOpen && product && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
           <div className="bg-gradient-to-b from-[#191e2b] to-[#11141e] border-2 border-[#E8A33D]/40 rounded-3xl w-full max-w-md p-8 shadow-[0_30px_60px_rgba(0,0,0,0.95)] flex flex-col gap-5 text-center">
             <h3 className="text-3xl font-extrabold text-white drop-shadow-md mb-1">اختر طريقة الدفع</h3>
@@ -811,7 +1062,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* نافذة فودافون كاش */}
+      {/* نافذة فودافون كاش (مطابقة تماماً للصفحة الرئيسية) */}
       {isVodafoneModalOpen && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md">
             <div className="bg-gradient-to-b from-[#17211e] to-[#101413] border-2 border-emerald-600/50 rounded-3xl w-full max-w-md p-8 shadow-[0_30px_60px_rgba(0,0,0,0.95)] flex flex-col gap-5 text-right" dir="rtl">
@@ -910,7 +1161,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* نافذة بينانس / USDT مع التحقق التلقائي */}
+      {/* نافذة بينانس / USDT مع التحقق التلقائي (مطابقة تماماً للصفحة الرئيسية) */}
       {isBinanceModalOpen && (
         <div 
           className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md"
@@ -949,7 +1200,6 @@ export default function Home() {
                   </div>
                 </div>
                 <p className="text-white/70 text-xs">تم تسجيل طلبك وتوثيق الدفع في النظام بنجاح. سيتم تفعيل حسابك مباشرة!</p>
-                
                 <a
                   href={`${settings.contact_whatsapp || "https://wa.me/201158413075?text="}${encodeURIComponent(`السلام عليكم، تم الدفع بنجاح عبر بينانس بقيمة ${paymentAudit?.actualAmount ?? binanceUsdAmount} USDT\nرقم الطلب: ${currentCryptoOrder?.orderId || ""}`)}`}
                   target="_blank"
@@ -959,10 +1209,7 @@ export default function Home() {
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" className="shrink-0"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.888-.788-1.489-1.761-1.665-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.82 9.82 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
                   <span>مراسلة الدعم وتفعيل الحساب</span>
                 </a>
-                <button 
-                  onClick={closeBinanceModal}
-                  className="w-full rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold py-2.5 transition text-xs"
-                >
+                <button onClick={closeBinanceModal} className="w-full rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold py-2.5 transition text-xs">
                   إغلاق النافذة
                 </button>
               </div>
@@ -1284,7 +1531,77 @@ export default function Home() {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
 
+      {/* سلة المشتريات (مطابقة تماماً للصفحة الرئيسية) */}
+      {isCartOpen && (
+        <div 
+          className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md overscroll-contain"
+          onClick={() => setIsCartOpen(false)}
+        >
+          <div 
+            className="bg-gradient-to-b from-[#181d2a] to-[#10131d] border border-white/20 rounded-3xl w-full max-w-md overflow-hidden shadow-[0_25px_50px_rgba(0,0,0,0.9)] flex flex-col max-h-[85vh] overscroll-contain"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-6 border-b border-white/10 bg-black/30">
+              <h3 className="text-2xl font-bold text-white drop-shadow">سلة المشتريات</h3>
+              <button onClick={() => setIsCartOpen(false)} className="text-white/60 hover:text-white transition p-2 bg-white/5 rounded-full"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+            </div>
+
+            <div className="p-6 overflow-y-auto flex-1 space-y-4 overscroll-contain touch-pan-y">
+              {cartCount === 0 ? (
+                <div className="text-center text-white/50 py-12 text-lg">السلة فارغة حالياً</div>
+              ) : (
+                <div className="flex flex-col gap-4">
+                  {Object.entries(cart).map(([id, qty]) => {
+                    const p = allProducts.find((x) => x.id === id) || (product?.id === id ? product : null);
+                    if (!p) return null;
+                    return (
+                      <div key={id} className="flex flex-col bg-white/[0.04] p-4 rounded-2xl border border-white/10 shadow-[0_8px_20px_rgba(0,0,0,0.4)]">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-3">
+                            <img src={p.image} alt={p.name} className="w-12 h-12 object-contain bg-black/60 rounded-xl p-1 border border-white/10" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                            <div>
+                              <h4 className="text-white font-bold text-base">{p.name}</h4>
+                              <div className="text-[#E8A33D] text-xs font-semibold mt-1">
+                                {formatPrice(p.price, settings.currency, Number(settings.usdt_rate))}
+                              </div>
+                            </div>
+                          </div>
+                          <button onClick={() => removeFromCart(id)} className="text-red-400 p-2 hover:bg-red-500/10 rounded-xl transition"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
+                        </div>
+                        <div className="flex items-center justify-between mt-4 pt-3 border-t border-white/5">
+                          <div className="flex items-center bg-black/60 rounded-xl p-1 border border-white/10 shadow-inner">
+                            <button onClick={() => decreaseQuantity(id)} className="w-9 h-9 text-white font-bold hover:text-[#E8A33D] transition">-</button>
+                            <span className="w-10 text-center text-white font-extrabold">{qty}</span>
+                            <button onClick={() => addToCart(id)} className="w-9 h-9 text-white font-bold hover:text-[#E8A33D] transition">+</button>
+                          </div>
+                          <div className="text-[#E8A33D] font-extrabold text-sm">
+                             {formatPrice(typeof p.price === 'number' ? p.price * qty : 0, settings.currency, Number(settings.usdt_rate))}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {cartCount > 0 && (
+              <div className="p-6 border-t border-white/10 bg-black/40 shadow-lg">
+                <div className="flex justify-between items-center mb-5">
+                  <span className="font-bold text-xl text-white">الإجمالي الكلي:</span>
+                  <div className="text-right flex flex-col items-end">
+                    <span className="font-extrabold text-2xl text-[#E8A33D] drop-shadow">
+                      {formatPrice(cartTotal, settings.currency, Number(settings.usdt_rate))}
+                    </span>
+                  </div>
+                </div>
+                <button onClick={handleCartCheckoutClick} className="w-full rounded-2xl bg-gradient-to-r from-[#E8A33D] to-[#d69230] py-4 font-display text-base font-extrabold text-[#10131A] transition-all hover:brightness-110 shadow-[0_10px_25px_rgba(232,163,61,0.4),inset_0_2px_4px_rgba(255,255,255,0.5)]">اختيار طريقة الدفع وإتمام الشراء</button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1299,6 +1616,11 @@ export default function Home() {
       <a href={settings.contact_whatsapp} target="_blank" rel="noopener noreferrer" style={{ ...floatingButtonStyle, bottom: "20px", background: "linear-gradient(135deg, #25D366 0%, #128C7E 100%)", color: "white" }}>
         <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.888-.788-1.489-1.761-1.665-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.82 9.82 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
       </a>
-    </main>
+
+      {/* Footer */}
+      <footer className="mt-20 border-t border-white/10 bg-black/40 py-8 text-center text-xs text-white/40">
+        <p>© {new Date().getFullYear()} {settings.website_name || "AI STORE"} — جميع الحقوق محفوظة.</p>
+      </footer>
+    </div>
   );
 }
