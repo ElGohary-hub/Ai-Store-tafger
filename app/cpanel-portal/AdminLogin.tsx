@@ -86,12 +86,6 @@ export default function AdminLogin() {
           >
             {isLoading ? "Signing in..." : "Sign in to Dashboard"}
           </button>
-
-          <div className="mt-4 rounded-2xl border border-white/10 bg-black/50 p-4 text-xs text-white/60 space-y-1 shadow-inner">
-            <p className="font-semibold text-white/90">Default Admin Credentials</p>
-            <p>Email: <span className="font-mono text-[#E8A33D] font-bold">admin@aistore.com</span></p>
-            <p>Password: <span className="font-mono text-[#E8A33D] font-bold">Admin1234!</span></p>
-          </div>
         </form>
       </div>
     </main>

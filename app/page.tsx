@@ -610,6 +610,59 @@ export default function Home() {
     }
   }
 
+  function getBinanceWhatsAppUrl(resultType: "success" | "overpaid" | "underpaid" | "exhausted") {
+    let text = `مرحباً السلام عليكم ورحمة الله وبركاتة\nأرغب في تأكيد طلب شراء:\n`;
+
+    let hasItems = false;
+    if (isCheckoutFromCart && Object.keys(cart).length > 0) {
+      Object.entries(cart).forEach(([id, qty]) => {
+        const p = products.find((x) => x.id === id);
+        if (p) {
+          text += `${p.name} x${qty}\n`;
+          hasItems = true;
+        }
+      });
+    } else if (selectedProductForBuy) {
+      text += `${selectedProductForBuy.name}\n`;
+      hasItems = true;
+    }
+
+    if (!hasItems && currentCryptoOrder?.productName) {
+      text += `${currentCryptoOrder.productName}\n`;
+    }
+
+    const effectiveTx = paymentAudit?.txHash || txIdInput.trim() || currentCryptoOrder?.orderId || "";
+    const paidAmount = paymentAudit?.actualAmount ?? binanceUsdAmount;
+
+    if (resultType === "success") {
+      text += `\nالمبلغ المدفوع: ${paidAmount} USDT`;
+      if (effectiveTx) text += `\nTxID: ${effectiveTx}`;
+      if (senderPhone) text += `\nرقم الهاتف: ${senderPhone}`;
+      text += `\nالحالة: تم الدفع بنجاح عبر بينانس ✓`;
+    } else if (resultType === "overpaid") {
+      text += `\nالمبلغ المطلوب: ${paymentAudit?.expectedAmount ?? binanceUsdAmount} USDT`;
+      text += `\nالمبلغ المدفوع: ${paidAmount} USDT`;
+      text += `\nالمبلغ الزائد (استرداد): +${paymentAudit ? Math.abs(paymentAudit.difference).toFixed(4) : "0"} USDT`;
+      if (effectiveTx) text += `\nTxID: ${effectiveTx}`;
+      if (senderPhone) text += `\nرقم الهاتف: ${senderPhone}`;
+    } else if (resultType === "underpaid") {
+      text += `\nالمبلغ المطلوب: ${paymentAudit?.expectedAmount ?? binanceUsdAmount} USDT`;
+      text += `\nالمبلغ المدفوع: ${paidAmount} USDT`;
+      text += `\nالمبلغ المتبقي: -${paymentAudit ? Math.abs(paymentAudit.difference).toFixed(4) : "0"} USDT`;
+      if (effectiveTx) text += `\nTxID: ${effectiveTx}`;
+      if (senderPhone) text += `\nرقم الهاتف: ${senderPhone}`;
+    } else {
+      text += `\nالمبلغ المطلوب: ${binanceUsdAmount} USDT`;
+      if (effectiveTx) text += `\nTxID: ${effectiveTx}`;
+      if (senderPhone) text += `\nرقم الهاتف: ${senderPhone}`;
+      text += `\nحالة الطلب: بانتظار التأكيد اليدوي`;
+    }
+
+    const baseWa = settings.contact_whatsapp || "https://wa.me/201040248751";
+    const cleanBase = baseWa.includes("?") ? baseWa.split("?")[0] : baseWa;
+    return `${cleanBase}?text=${encodeURIComponent(text)}`;
+  }
+
   const floatingButtonStyle = {
     position: "fixed" as const, right: "20px", borderRadius: "50%", width: "65px", height: "65px", display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid rgba(255,255,255,0.2)", cursor: "pointer", zIndex: 50, boxShadow: "0px 15px 25px rgba(0,0,0,0.8), inset 0px 5px 10px rgba(255,255,255,0.4), inset 0px -5px 10px rgba(0,0,0,0.5)", transition: "transform 0.2s ease"
   };
@@ -1024,7 +1077,7 @@ export default function Home() {
                 <p className="text-white/70 text-xs">تم تسجيل طلبك وتوثيق الدفع في النظام بنجاح. سيتم تفعيل حسابك مباشرة!</p>
                 
                 <a
-                  href={`${settings.contact_whatsapp || "https://wa.me/201040248751?text="}${encodeURIComponent(`السلام عليكم، تم الدفع بنجاح عبر بينانس بقيمة ${paymentAudit?.actualAmount ?? binanceUsdAmount} USDT\nرقم الطلب: ${currentCryptoOrder?.orderId || ""}`)}`}
+                  href={getBinanceWhatsAppUrl("success")}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-full rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 transition flex items-center justify-center gap-2 shadow-lg"
@@ -1076,7 +1129,7 @@ export default function Home() {
                 </div>
                 <p className="text-white/70 text-xs">تم تسجيل طلبك وتوثيق الدفع في النظام بنجاح. سيتم تفعيل حسابك مباشرة!</p>
                 <a
-                  href={`${settings.contact_whatsapp || "https://wa.me/201040248751?text="}${encodeURIComponent(`السلام عليكم، تم الدفع بنجاح عبر بينانس بقيمة ${paymentAudit?.actualAmount ?? binanceUsdAmount} USDT\nرقم الطلب: ${currentCryptoOrder?.orderId || ""}`)}`}
+                  href={getBinanceWhatsAppUrl("overpaid")}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-full rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 transition flex items-center justify-center gap-2 shadow-lg"
@@ -1124,7 +1177,7 @@ export default function Home() {
                   </div>
                 </div>
                 <a
-                  href={`${settings.contact_whatsapp || "https://wa.me/201040248751?text="}${encodeURIComponent(`السلام عليكم، قمت بتحويل ${paymentAudit?.actualAmount} USDT والمبلغ المطلوب هو ${paymentAudit?.expectedAmount} USDT (المتبقي: ${paymentAudit ? Math.abs(paymentAudit.difference).toFixed(4) : ""} USDT)\nرقم الطلب: ${currentCryptoOrder?.orderId || ""}\nTxID: ${paymentAudit?.txHash || ""}`)}`}
+                  href={getBinanceWhatsAppUrl("underpaid")}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-full rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 transition flex items-center justify-center gap-2 shadow-lg active:scale-95 text-sm"
@@ -1164,9 +1217,7 @@ export default function Home() {
                   </div>
                 </div>
                 <a
-                  href={`${settings.contact_whatsapp || "https://wa.me/201040248751?text="}${encodeURIComponent(
-                    `السلام عليكم، قمت بتحويل ${binanceUsdAmount} USDT ولم يتأكد تلقائياً بعد محاولتين\nرقم الطلب: ${currentCryptoOrder?.orderId || ""}\nTxID: ${txIdInput.trim()}`
-                  )}`}
+                  href={getBinanceWhatsAppUrl("exhausted")}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-full rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 transition flex items-center justify-center gap-2 shadow-lg active:scale-95 text-sm"
