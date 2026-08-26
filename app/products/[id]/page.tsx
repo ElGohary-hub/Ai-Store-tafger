@@ -37,6 +37,10 @@ type SettingsState = {
   hero_image: string;
   hero_button_text: string;
   hero_button_url: string;
+  hero_button_message?: string;
+  hero_button2_text?: string;
+  hero_button2_url?: string;
+  hero_button2_message?: string;
   contact_whatsapp: string;
   contact_phone: string;
   contact_email: string;
@@ -50,7 +54,11 @@ const DEFAULT_SETTINGS: SettingsState = {
   hero_description: "اشتراكات مدعومة بتفعيل احترافي وخدمة عملاء سريعة.",
   hero_image: "/p3.png",
   hero_button_text: "اطلب الآن",
-  hero_button_url: "https://wa.me/201040248751?text=مرحباً",
+  hero_button_url: "https://wa.me/201040248751",
+  hero_button_message: "مرحباً، أود الاستفسار عن باقات واشتراكات الذكاء الاصطناعي",
+  hero_button2_text: "",
+  hero_button2_url: "",
+  hero_button2_message: "",
   contact_whatsapp: "https://wa.me/201040248751?text=مرحباً",
   contact_phone: "01158413075",
   contact_email: "info@aistore.com",

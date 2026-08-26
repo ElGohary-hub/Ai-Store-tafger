@@ -271,6 +271,10 @@ export default function AdminPanel({ admin }: { admin: AdminInfo }) {
     hero_image: "",
     hero_button_text: "",
     hero_button_url: "",
+    hero_button_message: "",
+    hero_button2_text: "",
+    hero_button2_url: "",
+    hero_button2_message: "",
   });
 
   const filteredProducts = useMemo(() => {
@@ -347,6 +351,10 @@ export default function AdminPanel({ admin }: { admin: AdminInfo }) {
         hero_image: settingsData.hero_image || "",
         hero_button_text: settingsData.hero_button_text || "",
         hero_button_url: settingsData.hero_button_url || "",
+        hero_button_message: settingsData.hero_button_message || "",
+        hero_button2_text: settingsData.hero_button2_text || "",
+        hero_button2_url: settingsData.hero_button2_url || "",
+        hero_button2_message: settingsData.hero_button2_message || "",
       }));
     } catch (err) {
       console.error(err);
@@ -2396,23 +2404,74 @@ export default function AdminPanel({ admin }: { admin: AdminInfo }) {
                         />
                       </div>
 
-                      <div className="grid gap-4 sm:grid-cols-2">
+                      {/* CTA Button 1 */}
+                      <div className="rounded-2xl border border-white/10 bg-black/40 p-4 sm:p-5 space-y-3.5 shadow-inner">
+                        <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-[#E8A33D]">
+                          <span>🔘</span> CTA Button 1 (الزر الترويجي الأساسي)
+                        </div>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div>
+                            <label className="block text-xs sm:text-sm font-semibold text-white/80">CTA Button Text (نص زر الطلب)</label>
+                            <input
+                              value={siteForm.hero_button_text}
+                              onChange={(e) => setSiteForm({ ...siteForm, hero_button_text: e.target.value })}
+                              placeholder="e.g. اطلب الآن"
+                              className="mt-1.5 w-full rounded-2xl border border-white/15 bg-black/60 px-4 py-2.5 sm:py-3 text-sm text-white outline-none focus:border-[#E8A33D] shadow-inner transition placeholder:text-white/30"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs sm:text-sm font-semibold text-white/80">CTA Button Link / Number (رابط أو رقم الزر)</label>
+                            <input
+                              value={siteForm.hero_button_url}
+                              onChange={(e) => setSiteForm({ ...siteForm, hero_button_url: e.target.value })}
+                              placeholder="e.g. https://wa.me/201040248751 or 201040248751"
+                              className="mt-1.5 w-full rounded-2xl border border-white/15 bg-black/60 px-4 py-2.5 sm:py-3 text-sm text-white outline-none focus:border-[#E8A33D] font-mono shadow-inner transition placeholder:text-white/30"
+                            />
+                          </div>
+                        </div>
                         <div>
-                          <label className="block text-xs sm:text-sm font-semibold text-white/80">CTA Button Text (نص زر الطلب)</label>
+                          <label className="block text-xs sm:text-sm font-semibold text-white/80">WhatsApp Auto Message (رسالة الواتساب التلقائية عند الضغط)</label>
                           <input
-                            value={siteForm.hero_button_text}
-                            onChange={(e) => setSiteForm({ ...siteForm, hero_button_text: e.target.value })}
-                            placeholder="e.g. اطلب الآن"
+                            value={siteForm.hero_button_message}
+                            onChange={(e) => setSiteForm({ ...siteForm, hero_button_message: e.target.value })}
+                            placeholder="e.g. مرحباً، أود الاستفسار عن الاشتراكات المتوفرة"
                             className="mt-1.5 w-full rounded-2xl border border-white/15 bg-black/60 px-4 py-2.5 sm:py-3 text-sm text-white outline-none focus:border-[#E8A33D] shadow-inner transition placeholder:text-white/30"
                           />
                         </div>
+                      </div>
+
+                      {/* CTA Button 2 */}
+                      <div className="rounded-2xl border border-white/10 bg-black/40 p-4 sm:p-5 space-y-3.5 shadow-inner">
+                        <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-sky-400">
+                          <span>🔘</span> CTA Button 2 (الزر الترويجي الثاني)
+                        </div>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div>
+                            <label className="block text-xs sm:text-sm font-semibold text-white/80">CTA Button 2 Text (نص زر الطلب الثاني)</label>
+                            <input
+                              value={siteForm.hero_button2_text}
+                              onChange={(e) => setSiteForm({ ...siteForm, hero_button2_text: e.target.value })}
+                              placeholder="e.g. تواصل معنا / الدعم"
+                              className="mt-1.5 w-full rounded-2xl border border-white/15 bg-black/60 px-4 py-2.5 sm:py-3 text-sm text-white outline-none focus:border-[#E8A33D] shadow-inner transition placeholder:text-white/30"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs sm:text-sm font-semibold text-white/80">CTA Button 2 Link / Number (رابط أو رقم الزر الثاني)</label>
+                            <input
+                              value={siteForm.hero_button2_url}
+                              onChange={(e) => setSiteForm({ ...siteForm, hero_button2_url: e.target.value })}
+                              placeholder="e.g. https://wa.me/201040248751 or https://t.me/username"
+                              className="mt-1.5 w-full rounded-2xl border border-white/15 bg-black/60 px-4 py-2.5 sm:py-3 text-sm text-white outline-none focus:border-[#E8A33D] font-mono shadow-inner transition placeholder:text-white/30"
+                            />
+                          </div>
+                        </div>
                         <div>
-                          <label className="block text-xs sm:text-sm font-semibold text-white/80">CTA Button Link (رابط زر الطلب)</label>
+                          <label className="block text-xs sm:text-sm font-semibold text-white/80">CTA Button 2 WhatsApp Auto Message (رسالة الواتساب التلقائية للزر الثاني)</label>
                           <input
-                            value={siteForm.hero_button_url}
-                            onChange={(e) => setSiteForm({ ...siteForm, hero_button_url: e.target.value })}
-                            placeholder="e.g. https://wa.me/201040248751?text=مرحباً"
-                            className="mt-1.5 w-full rounded-2xl border border-white/15 bg-black/60 px-4 py-2.5 sm:py-3 text-sm text-white outline-none focus:border-[#E8A33D] font-mono shadow-inner transition placeholder:text-white/30"
+                            value={siteForm.hero_button2_message}
+                            onChange={(e) => setSiteForm({ ...siteForm, hero_button2_message: e.target.value })}
+                            placeholder="e.g. مرحباً، أحتاج مساعدة أو استفسار بخصوص الدعم"
+                            className="mt-1.5 w-full rounded-2xl border border-white/15 bg-black/60 px-4 py-2.5 sm:py-3 text-sm text-white outline-none focus:border-[#E8A33D] shadow-inner transition placeholder:text-white/30"
                           />
                         </div>
                       </div>

@@ -35,6 +35,10 @@ type SettingsState = {
   hero_image: string;
   hero_button_text: string;
   hero_button_url: string;
+  hero_button_message?: string;
+  hero_button2_text?: string;
+  hero_button2_url?: string;
+  hero_button2_message?: string;
   contact_whatsapp: string;
   contact_phone: string;
   contact_email: string;
@@ -48,7 +52,11 @@ const INITIAL_SETTINGS: SettingsState = {
   hero_description: "اشتراكات مدعومة بتفعيل احترافي وخدمة عملاء سريعة.",
   hero_image: "/p3.png",
   hero_button_text: "اطلب الآن",
-  hero_button_url: "https://wa.me/201040248751?text=مرحباً",
+  hero_button_url: "https://wa.me/201040248751",
+  hero_button_message: "مرحباً، أود الاستفسار عن باقات واشتراكات الذكاء الاصطناعي",
+  hero_button2_text: "",
+  hero_button2_url: "",
+  hero_button2_message: "",
   contact_whatsapp: "https://wa.me/201040248751?text=مرحباً",
   contact_phone: "01158413075",
   contact_email: "info@aistore.com",
@@ -620,8 +628,68 @@ export default function Home() {
           <h1 className="font-display text-4xl font-extrabold leading-tight text-white sm:text-5xl drop-shadow-[0_5px_15px_rgba(0,0,0,0.9)]">{settings.hero_title}</h1>
           <p className="mt-4 max-w-3xl text-base text-white/70">{settings.hero_description}</p>
           <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-            <a href={settings.hero_button_url} className="rounded-3xl bg-gradient-to-r from-[#E8A33D] to-[#d69230] px-7 py-4 text-sm font-extrabold text-[#10131A] transition hover:brightness-110">{settings.hero_button_text}</a>
-            <a href={settings.contact_whatsapp} className="rounded-3xl border border-white/15 bg-white/5 px-7 py-4 text-sm font-bold text-white transition hover:bg-white/10">Contact WhatsApp</a>
+            {settings.hero_button_text && (
+              <a 
+                href={(() => {
+                  const target = (settings.hero_button_url || "").trim();
+                  const msg = (settings.hero_button_message || "").trim();
+                  if (!target && !msg) return "#";
+                  const cleanNum = target.replace(/[\s\+\-\(\)]/g, "");
+                  if (/^\d{9,15}$/.test(cleanNum) && !target.startsWith("http")) {
+                    return msg ? `https://wa.me/${cleanNum}?text=${encodeURIComponent(msg)}` : `https://wa.me/${cleanNum}`;
+                  }
+                  if (target.includes("wa.me") || target.includes("whatsapp.com")) {
+                    if (msg) {
+                      const base = target.split("?")[0];
+                      return `${base}?text=${encodeURIComponent(msg)}`;
+                    }
+                    return target;
+                  }
+                  return target || (msg ? `https://wa.me/201040248751?text=${encodeURIComponent(msg)}` : "#");
+                })()} 
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-3xl bg-gradient-to-r from-[#E8A33D] to-[#d69230] px-7 py-4 text-sm font-extrabold text-[#10131A] transition hover:brightness-110 shadow-lg"
+              >
+                {settings.hero_button_text}
+              </a>
+            )}
+
+            {settings.hero_button2_text ? (
+              <a 
+                href={(() => {
+                  const target = (settings.hero_button2_url || "").trim();
+                  const msg = (settings.hero_button2_message || "").trim();
+                  if (!target && !msg) return settings.contact_whatsapp || "#";
+                  const cleanNum = target.replace(/[\s\+\-\(\)]/g, "");
+                  if (/^\d{9,15}$/.test(cleanNum) && !target.startsWith("http")) {
+                    return msg ? `https://wa.me/${cleanNum}?text=${encodeURIComponent(msg)}` : `https://wa.me/${cleanNum}`;
+                  }
+                  if (target.includes("wa.me") || target.includes("whatsapp.com")) {
+                    if (msg) {
+                      const base = target.split("?")[0];
+                      return `${base}?text=${encodeURIComponent(msg)}`;
+                    }
+                    return target;
+                  }
+                  return target || (msg ? `https://wa.me/201040248751?text=${encodeURIComponent(msg)}` : settings.contact_whatsapp);
+                })()} 
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-3xl border border-white/15 bg-white/5 px-7 py-4 text-sm font-bold text-white transition hover:bg-white/10 shadow-lg"
+              >
+                {settings.hero_button2_text}
+              </a>
+            ) : (
+              <a 
+                href={settings.contact_whatsapp} 
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-3xl border border-white/15 bg-white/5 px-7 py-4 text-sm font-bold text-white transition hover:bg-white/10"
+              >
+                Contact WhatsApp
+              </a>
+            )}
           </div>
         </div>
       </header>
