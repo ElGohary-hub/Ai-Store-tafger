@@ -50,8 +50,8 @@ const DEFAULT_SETTINGS: SettingsState = {
   hero_description: "اشتراكات مدعومة بتفعيل احترافي وخدمة عملاء سريعة.",
   hero_image: "/p3.png",
   hero_button_text: "اطلب الآن",
-  hero_button_url: "https://wa.me/201158413075?text=مرحباً",
-  contact_whatsapp: "https://wa.me/201158413075?text=مرحباً",
+  hero_button_url: "https://wa.me/201040248751?text=مرحباً",
+  contact_whatsapp: "https://wa.me/201040248751?text=مرحباً",
   contact_phone: "01158413075",
   contact_email: "info@aistore.com",
   currency: "ج.م",
@@ -639,7 +639,7 @@ export default function ProductDetailsPage() {
       orderText += `\n\nرابط إيصال التحويل المرفق:\n${receiptUrl}`;
     }
 
-    window.open(`${settings.contact_whatsapp || "https://wa.me/201158413075?text="}${encodeURIComponent(orderText)}`, "_blank");
+    window.open(`${settings.contact_whatsapp || "https://wa.me/201040248751?text="}${encodeURIComponent(orderText)}`, "_blank");
     setIsVodafoneModalOpen(false);
     setIsPaymentModalOpen(false);
   }
@@ -647,7 +647,7 @@ export default function ProductDetailsPage() {
   function handleDirectWhatsApp() {
     if (!product) return;
     const text = `مرحباً، أرغب في الاستفسار وشراء: ${product.name} بسعر ${product.price} ${settings.currency || "ج.م"}`;
-    window.open(`${settings.contact_whatsapp || "https://wa.me/201158413075?text="}${encodeURIComponent(text)}`, "_blank");
+    window.open(`${settings.contact_whatsapp || "https://wa.me/201040248751?text="}${encodeURIComponent(text)}`, "_blank");
   }
 
   const relatedProducts = useMemo(() => {
@@ -1201,7 +1201,7 @@ export default function ProductDetailsPage() {
                 </div>
                 <p className="text-white/70 text-xs">تم تسجيل طلبك وتوثيق الدفع في النظام بنجاح. سيتم تفعيل حسابك مباشرة!</p>
                 <a
-                  href={`${settings.contact_whatsapp || "https://wa.me/201158413075?text="}${encodeURIComponent(`السلام عليكم، تم الدفع بنجاح عبر بينانس بقيمة ${paymentAudit?.actualAmount ?? binanceUsdAmount} USDT\nرقم الطلب: ${currentCryptoOrder?.orderId || ""}`)}`}
+                  href={`${settings.contact_whatsapp || "https://wa.me/201040248751?text="}${encodeURIComponent(`السلام عليكم، تم الدفع بنجاح عبر بينانس بقيمة ${paymentAudit?.actualAmount ?? binanceUsdAmount} USDT\nرقم الطلب: ${currentCryptoOrder?.orderId || ""}`)}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-full rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 transition flex items-center justify-center gap-2 shadow-lg"
@@ -1250,7 +1250,7 @@ export default function ProductDetailsPage() {
                 </div>
                 <p className="text-white/70 text-xs">تم تسجيل طلبك وتوثيق الدفع في النظام بنجاح. سيتم تفعيل حسابك مباشرة!</p>
                 <a
-                  href={`${settings.contact_whatsapp || "https://wa.me/201158413075?text="}${encodeURIComponent(`السلام عليكم، تم الدفع بنجاح عبر بينانس بقيمة ${paymentAudit?.actualAmount ?? binanceUsdAmount} USDT\nرقم الطلب: ${currentCryptoOrder?.orderId || ""}`)}`}
+                  href={`${settings.contact_whatsapp || "https://wa.me/201040248751?text="}${encodeURIComponent(`السلام عليكم، تم الدفع بنجاح عبر بينانس بقيمة ${paymentAudit?.actualAmount ?? binanceUsdAmount} USDT\nرقم الطلب: ${currentCryptoOrder?.orderId || ""}`)}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-full rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 transition flex items-center justify-center gap-2 shadow-lg"
@@ -1298,7 +1298,7 @@ export default function ProductDetailsPage() {
                   </div>
                 </div>
                 <a
-                  href={`${settings.contact_whatsapp || "https://wa.me/201158413075?text="}${encodeURIComponent(`السلام عليكم، قمت بتحويل ${paymentAudit?.actualAmount} USDT والمبلغ المطلوب هو ${paymentAudit?.expectedAmount} USDT (المتبقي: ${paymentAudit ? Math.abs(paymentAudit.difference).toFixed(4) : ""} USDT)\nرقم الطلب: ${currentCryptoOrder?.orderId || ""}\nTxID: ${paymentAudit?.txHash || ""}`)}`}
+                  href={`${settings.contact_whatsapp || "https://wa.me/201040248751?text="}${encodeURIComponent(`السلام عليكم، قمت بتحويل ${paymentAudit?.actualAmount} USDT والمبلغ المطلوب هو ${paymentAudit?.expectedAmount} USDT (المتبقي: ${paymentAudit ? Math.abs(paymentAudit.difference).toFixed(4) : ""} USDT)\nرقم الطلب: ${currentCryptoOrder?.orderId || ""}\nTxID: ${paymentAudit?.txHash || ""}`)}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-full rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 transition flex items-center justify-center gap-2 shadow-lg active:scale-95 text-sm"
@@ -1338,7 +1338,7 @@ export default function ProductDetailsPage() {
                   </div>
                 </div>
                 <a
-                  href={`${settings.contact_whatsapp || "https://wa.me/201158413075?text="}${encodeURIComponent(
+                  href={`${settings.contact_whatsapp || "https://wa.me/201040248751?text="}${encodeURIComponent(
                     `السلام عليكم، قمت بتحويل ${binanceUsdAmount} USDT ولم يتأكد تلقائياً بعد محاولتين\nرقم الطلب: ${currentCryptoOrder?.orderId || ""}\nTxID: ${txIdInput.trim()}`
                   )}`}
                   target="_blank"

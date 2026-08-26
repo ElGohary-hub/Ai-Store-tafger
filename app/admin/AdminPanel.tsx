@@ -2411,7 +2411,7 @@ export default function AdminPanel({ admin }: { admin: AdminInfo }) {
                           <input
                             value={siteForm.hero_button_url}
                             onChange={(e) => setSiteForm({ ...siteForm, hero_button_url: e.target.value })}
-                            placeholder="e.g. https://wa.me/201158413075?text=مرحباً"
+                            placeholder="e.g. https://wa.me/201040248751?text=مرحباً"
                             className="mt-1.5 w-full rounded-2xl border border-white/15 bg-black/60 px-4 py-2.5 sm:py-3 text-sm text-white outline-none focus:border-[#E8A33D] font-mono shadow-inner transition placeholder:text-white/30"
                           />
                         </div>
@@ -2480,7 +2480,7 @@ export default function AdminPanel({ admin }: { admin: AdminInfo }) {
                         <input
                           value={siteForm.contact_whatsapp}
                           onChange={(e) => setSiteForm({ ...siteForm, contact_whatsapp: e.target.value })}
-                          placeholder="https://wa.me/201158413075"
+                          placeholder="https://wa.me/201040248751"
                           className="mt-1.5 w-full rounded-2xl border border-white/15 bg-black/60 px-4 py-2.5 sm:py-3 text-sm text-white outline-none focus:border-[#E8A33D] shadow-inner transition placeholder:text-white/30"
                         />
                       </div>

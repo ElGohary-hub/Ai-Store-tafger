@@ -30,7 +30,7 @@ model Product {
 model SiteSettings {
   id            String   @id @default(auto()) @map("_id") @db.ObjectId
   storeName     String   @default("AI STORE")
-  whatsapp      String   @default("201158413075")
+  whatsapp      String   @default("201040248751")
   heroTitle     String   @default("اختر الباقة المناسبة لك")
   heroSubtitle  String   @default("الذكاء الاصطناعي بين يديك")
   updatedAt     DateTime @updatedAt
