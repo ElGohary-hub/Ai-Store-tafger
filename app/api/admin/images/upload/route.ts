@@ -22,6 +22,9 @@ export async function POST(req: NextRequest) {
       if (!file) {
         return NextResponse.json({ error: "No file provided" }, { status: 400 });
       }
+      if (file.size > 10 * 1024 * 1024) {
+        return NextResponse.json({ error: "حجم الصورة كبير جداً (الحد الأقصى 10 ميجابايت)" }, { status: 400 });
+      }
       filename = file.name || filename;
       const arrayBuffer = await file.arrayBuffer();
       inputBuffer = Buffer.from(arrayBuffer);
@@ -31,6 +34,9 @@ export async function POST(req: NextRequest) {
         // Base64 Data URL
         const base64Data = body.data.replace(/^data:image\/\w+;base64,/, "");
         inputBuffer = Buffer.from(base64Data, "base64");
+        if (inputBuffer.length > 10 * 1024 * 1024) {
+          return NextResponse.json({ error: "حجم الصورة كبير جداً (الحد الأقصى 10 ميجابايت)" }, { status: 400 });
+        }
         filename = body.filename || filename;
       }
     }

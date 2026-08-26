@@ -34,11 +34,13 @@ export async function GET(req: NextRequest) {
   }
 
   if (search) {
+    const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const safeSearch = escapeRegex(search);
     const searchConditions = [
-      { customer_name: { $regex: search, $options: "i" } },
-      { order_id: { $regex: search, $options: "i" } },
-      { tx_hash: { $regex: search, $options: "i" } },
-      { binance_order_id: { $regex: search, $options: "i" } },
+      { customer_name: { $regex: safeSearch, $options: "i" } },
+      { order_id: { $regex: safeSearch, $options: "i" } },
+      { tx_hash: { $regex: safeSearch, $options: "i" } },
+      { binance_order_id: { $regex: safeSearch, $options: "i" } },
     ];
 
     if (query.$or) {

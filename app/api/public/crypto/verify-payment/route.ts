@@ -74,20 +74,22 @@ export async function POST(req: NextRequest) {
 
     const activeTx = (txHash || payment.tx_hash || "").trim();
 
-    // TEST MODE: Entering "1" as the TxID/transaction input immediately approves the payment
-    const isTestBypass = activeTx === "1";
+    // TEST MODE: Only allow if specifically enabled via environment variable
+    const isTestBypass = process.env.ALLOW_TEST_PAYMENT_BYPASS === "true" && activeTx === "1";
 
     // Strict duplicate check: If a txHash is submitted, ensure it wasn't already successfully claimed/verified by another order
     if (activeTx && !isTestBypass) {
       const clean = activeTx.toLowerCase();
       const cleanWithout0x = clean.replace(/^0x/, "");
+      const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      
       const duplicateOrder = await db.collection("crypto_payments").findOne({
         order_id: { $ne: orderId },
         status: { $in: ["completed", "paid", "underpaid"] },
         $or: [
-          { tx_hash: { $regex: new RegExp(`^${clean}$`, "i") } },
-          { tx_hash: { $regex: new RegExp(`^0x${cleanWithout0x}$`, "i") } },
-          { tx_hash: { $regex: new RegExp(`^${cleanWithout0x}$`, "i") } },
+          { tx_hash: { $regex: new RegExp(`^${escapeRegex(clean)}$`, "i") } },
+          { tx_hash: { $regex: new RegExp(`^0x${escapeRegex(cleanWithout0x)}$`, "i") } },
+          { tx_hash: { $regex: new RegExp(`^${escapeRegex(cleanWithout0x)}$`, "i") } },
         ],
       });
 

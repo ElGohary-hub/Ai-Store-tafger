@@ -1,9 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { randomBytes } from "crypto";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
   try {
+    const ip = getClientIp(req.headers);
+    const rateLimit = checkRateLimit(`crypto_order_${ip}`, { limit: 20, windowMs: 10 * 60 * 1000 }); // Max 20 crypto order creations per 10 mins
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { error: "تم تجاوز الحد المسموح من الطلبات. يرجى الانتظار قليلاً." },
+        { status: 429 }
+      );
+    }
+
     const body = await req.json();
     const { customerName, customerPhone, productId, productName, amount, network, currency = "USDT" } = body;
 

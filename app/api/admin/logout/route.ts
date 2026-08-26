@@ -9,7 +9,9 @@ export async function POST(req: NextRequest) {
       token = (await cookies()).get("cms_token")?.value;
     } catch {}
   }
-  revokeSession(token);
+  if (token) {
+    await revokeSession(token);
+  }
   const response = NextResponse.json({ success: true });
   response.cookies.set("cms_token", "", { path: "/", maxAge: 0 });
   return response;

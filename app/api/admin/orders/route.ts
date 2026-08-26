@@ -17,11 +17,13 @@ export async function GET(req: NextRequest) {
 
     let query: any = {};
     if (search) {
+      const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const safeSearch = escapeRegex(search);
       query = {
         $or: [
-          { customer_name: { $regex: search, $options: "i" } },
-          { customer_email: { $regex: search, $options: "i" } },
-          { customer_phone: { $regex: search, $options: "i" } },
+          { customer_name: { $regex: safeSearch, $options: "i" } },
+          { customer_email: { $regex: safeSearch, $options: "i" } },
+          { customer_phone: { $regex: safeSearch, $options: "i" } },
         ],
       };
     }

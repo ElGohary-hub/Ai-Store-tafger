@@ -3,9 +3,19 @@ import { getDb } from "@/lib/mongodb";
 import { randomBytes } from "crypto";
 import sharp from "sharp";
 import { Binary } from "mongodb";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
   try {
+    const ip = getClientIp(req.headers);
+    const rateLimit = checkRateLimit(`submit_insta_${ip}`, { limit: 15, windowMs: 10 * 60 * 1000 }); // Max 15 submissions per 10 mins
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { error: "تم تجاوز الحد المسموح من الطلبات. يرجى الانتظار قليلاً." },
+        { status: 429 }
+      );
+    }
+
     const formData = await req.formData();
     const senderPhone = (formData.get("senderPhone") as string)?.trim();
     const customerName = (formData.get("customerName") as string)?.trim() || "عميل إنستاباي / فودافون";
@@ -25,6 +35,9 @@ export async function POST(req: NextRequest) {
 
     // If receipt screenshot is uploaded, process with Sharp and store in MongoDB images
     if (receiptFile && receiptFile.size > 0) {
+      if (receiptFile.size > 8 * 1024 * 1024) {
+        return NextResponse.json({ error: "حجم الصورة كبير جداً (الحد الأقصى 8 ميجابايت)" }, { status: 400 });
+      }
       try {
         const arrayBuffer = await receiptFile.arrayBuffer();
         const inputBuffer = Buffer.from(arrayBuffer);

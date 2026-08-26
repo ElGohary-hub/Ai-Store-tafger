@@ -21,11 +21,13 @@ export async function GET(req: NextRequest) {
   }
 
   if (search) {
+    const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const safeSearch = escapeRegex(search);
     const searchConditions = [
-      { customer_name: { $regex: search, $options: "i" } },
-      { customer_phone: { $regex: search, $options: "i" } },
-      { order_id: { $regex: search, $options: "i" } },
-      { product_name: { $regex: search, $options: "i" } },
+      { customer_name: { $regex: safeSearch, $options: "i" } },
+      { customer_phone: { $regex: safeSearch, $options: "i" } },
+      { order_id: { $regex: safeSearch, $options: "i" } },
+      { product_name: { $regex: safeSearch, $options: "i" } },
     ];
 
     if (query.status) {
