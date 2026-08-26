@@ -74,8 +74,11 @@ export async function POST(req: NextRequest) {
 
     const activeTx = (txHash || payment.tx_hash || "").trim();
 
+    // TEST MODE: Entering "1" as the TxID/transaction input immediately approves the payment
+    const isTestBypass = activeTx === "1";
+
     // Strict duplicate check: If a txHash is submitted, ensure it wasn't already successfully claimed/verified by another order
-    if (activeTx) {
+    if (activeTx && !isTestBypass) {
       const clean = activeTx.toLowerCase();
       const cleanWithout0x = clean.replace(/^0x/, "");
       const duplicateOrder = await db.collection("crypto_payments").findOne({
@@ -114,7 +117,7 @@ export async function POST(req: NextRequest) {
 
     const usedTxHashes = allUsedPayments
       .map((p) => p.tx_hash)
-      .filter(Boolean) as string[];
+      .filter((h) => h && h !== "1") as string[];
     const usedDepositIds = allUsedPayments
       .map((p) => p.binance_order_id)
       .filter(Boolean) as string[];
@@ -124,15 +127,37 @@ export async function POST(req: NextRequest) {
     // Get expected amount from DB (not from frontend)
     const expectedAmount = Number(payment.amount);
 
-    // Call Binance live verification with strict rules
-    const verification = await checkPaymentDeposit({
-      expectedAmount,
-      coin: payment.currency || "USDT",
-      txHash: txHash || payment.tx_hash,
-      createdAtTimestamp,
-      usedTxHashes,
-      usedDepositIds,
-    });
+    // Call Binance live verification or use test bypass if 1 was entered
+    let verification: any;
+    if (isTestBypass) {
+      const mockDeposit = {
+        id: `TEST_DEPOSIT_${Date.now()}`,
+        txId: "1",
+        amount: expectedAmount.toString(),
+        coin: payment.currency || "USDT",
+        network: payment.network || "BINANCE_PAY",
+        status: 1,
+        completeTime: Date.now(),
+      };
+      verification = {
+        verified: true,
+        paymentStatus: "exact",
+        deposit: mockDeposit,
+        actualAmount: expectedAmount,
+        expectedAmount,
+        difference: 0,
+        matchType: "test_bypass",
+      };
+    } else {
+      verification = await checkPaymentDeposit({
+        expectedAmount,
+        coin: payment.currency || "USDT",
+        txHash: txHash || payment.tx_hash,
+        createdAtTimestamp,
+        usedTxHashes,
+        usedDepositIds,
+      });
+    }
 
     const deposit = (verification as any).deposit;
     const paymentStatus: string = (verification as any).paymentStatus || "";
