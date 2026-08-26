@@ -521,6 +521,11 @@ export default function ProductDetailsPage() {
       const data = await res.json();
       setIsVerifying(false);
 
+      if (!res.ok || data.error) {
+        setVerificationError(data.error || data.message || "حدث خطأ أثناء الاتصال بالخادم.");
+        return;
+      }
+
       if (data.retryAfterSeconds && data.retryAfterSeconds > 0) {
         localStorage.setItem("crypto_fail_count", "1");
         const until = Date.now() + data.retryAfterSeconds * 1000;
