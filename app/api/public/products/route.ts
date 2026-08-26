@@ -20,7 +20,9 @@ export async function GET() {
       description: p.description || "",
       detail: p.description || "",
       price: p.price,
+      price_usd: p.price_usd !== undefined ? p.price_usd : 0,
       original_price: p.original_price,
+      original_price_usd: p.original_price_usd !== undefined ? p.original_price_usd : 0,
       discount_enabled: p.discount_enabled,
       discount_percentage: p.discount_percentage,
       featured: p.featured,
@@ -36,6 +38,7 @@ export async function GET() {
       fake_sales_count: Number(p.fake_sales_count) || 0,
       long_description: p.long_description || p.description || "",
       warranty: p.warranty || "",
+      plans: Array.isArray(p.plans) ? p.plans : [],
     }));
 
     return NextResponse.json(products, {

@@ -3,6 +3,15 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import Link from "next/link";
 
+type SubscriptionPlan = {
+  name: string;
+  price: number;
+  price_usd?: number;
+  original_price?: number;
+  original_price_usd?: number;
+  discount_badge?: string;
+};
+
 type Product = {
   id: string;
   sku?: string;
@@ -10,7 +19,9 @@ type Product = {
   description?: string;
   detail?: string;
   price: number | string;
+  price_usd?: number;
   original_price?: number;
+  original_price_usd?: number;
   discount_enabled?: number;
   discount_percentage?: number;
   featured?: number;
@@ -26,6 +37,7 @@ type Product = {
   fake_sales_count?: number;
   long_description?: string;
   warranty?: string;
+  plans?: SubscriptionPlan[];
 };
 
 type SettingsState = {
@@ -48,62 +60,91 @@ type SettingsState = {
 
 const INITIAL_SETTINGS: SettingsState = {
   website_name: "AI STORE",
-  hero_title: "اختر الباقة المناسبة لك",
-  hero_description: "اشتراكات مدعومة بتفعيل احترافي وخدمة عملاء سريعة.",
-  hero_image: "/p3.png",
-  hero_button_text: "اطلب الآن",
-  hero_button_url: "https://wa.me/201040248751",
-  hero_button_message: "مرحباً، أود الاستفسار عن باقات واشتراكات الذكاء الاصطناعي",
-  hero_button2_text: "",
-  hero_button2_url: "",
-  hero_button2_message: "",
-  contact_whatsapp: "https://wa.me/201040248751?text=مرحباً",
-  contact_phone: "01158413075",
-  contact_email: "info@aistore.com",
+  hero_title: "أفضل اشتراكات الذكاء الاصطناعي",
+  hero_description: "احصل على حسابات واشتراكات بريميوم بأفضل الأسعار وأعلى جودة وأمان وضمان كامل.",
+  hero_image: "/h.png",
+  hero_button_text: "تصفح الاشتراكات",
+  hero_button_url: "#products",
+  contact_whatsapp: "https://wa.me/201040248751",
+  contact_phone: "+201040248751",
+  contact_email: "support@aistore.com",
   currency: "ج.م",
   usdt_rate: "50",
 };
 
-const DEFAULT_PRODUCTS: Product[] = [
-  { id: "canva", name: "Canva Pro", detail: "اشتراك Canva Pro مدي الحياه والدفع بعد التفعيل. يتم التفعيل علي حسابك الشخصي وبشكل رسمي من كانفا!", price: 70, image: "/p3.png", sales_count: 0, fake_sales_count: 0 },
-  { id: "google", name: "Google Plan", detail: "تشمل: Gemini Pro, Antigravity, Nano Banana, NotebookLM, 5TB تخزين سحابي, Google Flow 1000 Credit/M", price: 70, image: "/p4.png", sales_count: 0, fake_sales_count: 0 },
-  { id: "capcut", name: "CapCut", detail: "التفعيل لمدة شهر فقط، تستلم حساب خاص فيك متفعل جاهز", price: 70, image: "/p10.png", sales_count: 0, fake_sales_count: 0 },
-  { id: "coursera", name: "Coursera", detail: "باقة البلص، كل الكورسات مفتوحة، يتم ارسال حساب خاص فيك متفعل جاهز", price: 70, image: "/p6.png", sales_count: 0, fake_sales_count: 0 },
-  { id: "office", name: "Microsoft Office 365", detail: "باقة البلص، 5 أجهزة، 100 جيجابايت ون درايف، تفعيل 12 شهر (ويندوز فقط)", price: 70, image: "/p5.png", sales_count: 0, fake_sales_count: 0 },
-  { id: "leonardo", name: "Leonardo Ai", detail: "شهر واحد وصول كامل، 8500 رصيد، حساب خاص بك، تفعيل مباشر", price: 70, image: "/p16.png", sales_count: 0, fake_sales_count: 0 },
-  { id: "notion", name: "Notion", detail: "باقة البلص، باقي التفاصيل كلمني", price: 70, image: "/p13.png", sales_count: 0, fake_sales_count: 0 },
-  { id: "adobe", name: "Adobe Express", detail: "عضوية مميزة لمدة 12 شهر، لا حاجة لـ VPN أو VISA، تفعيل مباشر", price: 70, image: "/p14.png", sales_count: 0, fake_sales_count: 0 },
-  { id: "gamma", name: "Gamma Ai", detail: "حسب الباقة، تواصل معي للتفاصيل", price: 70, image: "/p11.png", sales_count: 0, fake_sales_count: 0 },
-  { id: "youtube", name: "YouTube", detail: "حسب المدة والباقة، تواصل معي للتفاصيل", price: 70, image: "/p12.png", sales_count: 0, fake_sales_count: 0 },
-  { id: "chatgpt", name: "ChatGPT", detail: "حسب المدة والباقة، تواصل معي للتفاصيل", price: 70, image: "/p15.png", sales_count: 0, fake_sales_count: 0 },
-  { id: "claude", name: "Claude", detail: "حسب الباقة، تواصل معي للتفاصيل", price: 70, image: "/p7.png", sales_count: 0, fake_sales_count: 0 },
-  { id: "manus", name: "Manus", detail: "حسب الباقة، تواصل معي للتفاصيل", price: 70, image: "/p1.png", sales_count: 0, fake_sales_count: 0 },
-  { id: "higgsfield", name: "Higgsfield", detail: "حسب الباقة، تواصل معي للتفاصيل", price: 70, image: "/p2.png", sales_count: 0, fake_sales_count: 0 },
-  { id: "grok", name: "Grok", detail: "حسب الباقة، تواصل معي للتفاصيل", price: 70, image: "/p8.png", sales_count: 0, fake_sales_count: 0 },
-  { id: "figma", name: "Figma", detail: "حسب الباقة، تواصل معي للتفاصيل", price: 70, image: "/p9.png", sales_count: 0, fake_sales_count: 0 },
-];
-
-function formatPrice(p: number | string, currency = "ج.م", usdtRate = 50) {
-  if (typeof p === "number") {
-    const rate = usdtRate > 0 ? usdtRate : 50;
-    const usdVal = (p / rate).toFixed(2).replace(/\.00$/, "").replace(/(\.[1-9])0$/, "$1");
+function formatPrice(pEgp: number | string, pUsd?: number | string, currency = "ج.م") {
+  const numEgp = typeof pEgp === "number" ? pEgp : parseFloat(pEgp as string) || 0;
+  const numUsd = pUsd !== undefined ? (typeof pUsd === "number" ? pUsd : parseFloat(pUsd as string) || 0) : 0;
+  if (numUsd > 0) {
     return (
       <span className="flex items-center justify-center gap-1.5" dir="rtl">
-        <span>{p} {currency}</span>
+        <span>{numEgp} {currency}</span>
         <span className="text-white/40 font-medium">/</span>
-        <span dir="ltr">{usdVal}$</span>
+        <span dir="ltr" className="text-emerald-400 font-bold font-mono">{numUsd}$</span>
       </span>
     );
   }
-  return <span dir="rtl">{p}</span>;
+  return <span dir="rtl">{numEgp} {currency}</span>;
+}
+
+function parseCartKey(key: string) {
+  if (key.includes("__plan_")) {
+    const [baseId, planIdxStr] = key.split("__plan_");
+    return { baseId, planIndex: parseInt(planIdxStr, 10) };
+  }
+  return { baseId: key, planIndex: null };
+}
+
+function getCartItemInfo(cartKey: string, allProductsList: Product[]) {
+  const { baseId, planIndex } = parseCartKey(cartKey);
+  const p = allProductsList.find((item) => item.id === baseId);
+  if (!p) return null;
+
+  if (planIndex !== null && p.plans && p.plans[planIndex]) {
+    const plan = p.plans[planIndex];
+    return {
+      product: p,
+      name: `${p.name} (${plan.name})`,
+      price: Number(plan.price) || 0,
+      price_usd: plan.price_usd !== undefined ? Number(plan.price_usd) : 0,
+      image: p.image,
+      stock: p.stock,
+    };
+  }
+
+  return {
+    product: p,
+    name: p.name,
+    price: typeof p.price === "number" ? p.price : parseFloat(p.price as string) || 0,
+    price_usd: p.price_usd !== undefined ? Number(p.price_usd) : 0,
+    image: p.image,
+    stock: p.stock,
+  };
 }
 
 export default function Home() {
-  const [products, setProducts] = useState<Product[]>(DEFAULT_PRODUCTS);
+  const [products, setProducts] = useState<Product[]>([]);
   const [settings, setSettings] = useState<SettingsState>(INITIAL_SETTINGS);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [cart, setCart] = useState<Record<string, number>>({});
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [selectedProductForBuy, setSelectedProductForBuy] = useState<Product | null>(null);
+  const [isCheckoutFromCart, setIsCheckoutFromCart] = useState(false);
+  const [selectedPlanIndex, setSelectedPlanIndex] = useState<number>(0);
+
+  const activeSingleBuyPlan = selectedProductForBuy?.plans && selectedProductForBuy.plans.length > 0
+    ? selectedProductForBuy.plans[selectedPlanIndex] || selectedProductForBuy.plans[0]
+    : null;
+  const activeSingleBuyPrice = activeSingleBuyPlan
+    ? Number(activeSingleBuyPlan.price)
+    : (selectedProductForBuy ? (typeof selectedProductForBuy.price === "number" ? selectedProductForBuy.price : parseFloat(selectedProductForBuy.price as string) || 0) : 0);
+  const activeSingleBuyPriceUsd = activeSingleBuyPlan
+    ? Number(activeSingleBuyPlan.price_usd || 0)
+    : Number(selectedProductForBuy?.price_usd || 0);
+  const activeSingleBuyName = activeSingleBuyPlan
+    ? `${selectedProductForBuy?.name} (${activeSingleBuyPlan.name})`
+    : (selectedProductForBuy?.name || "");
   
   const [isBinanceModalOpen, setIsBinanceModalOpen] = useState(false);
   const [isVodafoneModalOpen, setIsVodafoneModalOpen] = useState(false);
@@ -156,12 +197,30 @@ export default function Home() {
     };
   }, []);
 
-  const [selectedProductForBuy, setSelectedProductForBuy] = useState<Product | null>(null);
-  const [isCheckoutFromCart, setIsCheckoutFromCart] = useState(false);
   const [phoneError, setPhoneError] = useState("");
   const [toastMessage, setToastMessage] = useState("");
 
   useEffect(() => {
+    // 1. Instant Cache Hydration: If cached data exists in sessionStorage, render it instantly (0ms delay)
+    try {
+      const cachedProds = sessionStorage.getItem("ai_store_cached_products");
+      const cachedSetts = sessionStorage.getItem("ai_store_cached_settings");
+      if (cachedProds) {
+        const parsed = JSON.parse(cachedProds);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setProducts(parsed);
+          setIsLoadingProducts(false);
+        }
+      }
+      if (cachedSetts) {
+        const parsed = JSON.parse(cachedSetts);
+        if (parsed && typeof parsed === "object") {
+          setSettings((prev) => ({ ...prev, ...parsed }));
+        }
+      }
+    } catch {}
+
+    // 2. Fetch fresh live data from database in background
     async function loadData() {
       try {
         const [productsRes, settingsRes] = await Promise.all([
@@ -171,13 +230,21 @@ export default function Home() {
         if (productsRes.ok) {
           const productData = await productsRes.json();
           setProducts(productData);
+          try {
+            sessionStorage.setItem("ai_store_cached_products", JSON.stringify(productData));
+          } catch {}
         }
         if (settingsRes.ok) {
           const settingsData = await settingsRes.json();
           setSettings((prev) => ({ ...prev, ...settingsData }));
+          try {
+            sessionStorage.setItem("ai_store_cached_settings", JSON.stringify(settingsData));
+          } catch {}
         }
       } catch (error) {
         console.error("Failed to load public data:", error);
+      } finally {
+        setIsLoadingProducts(false);
       }
     }
     loadData();
@@ -257,31 +324,43 @@ export default function Home() {
   const cartCount = useMemo(() => Object.values(cart).reduce((a, b) => a + b, 0), [cart]);
   
   const cartTotal = useMemo(() =>
-    Object.entries(cart).reduce((sum, [id, qty]) => {
-      const p = products.find((p) => p.id === id);
-      return sum + (p && typeof p.price === 'number' ? p.price * qty : 0);
+    Object.entries(cart).reduce((sum, [key, qty]) => {
+      const info = getCartItemInfo(key, products);
+      return sum + (info ? info.price * qty : 0);
+    }, 0),
+  [cart, products]);
+
+  const cartTotalUsd = useMemo(() =>
+    Object.entries(cart).reduce((sum, [key, qty]) => {
+      const info = getCartItemInfo(key, products);
+      return sum + (info ? (info.price_usd > 0 ? info.price_usd * qty : (info.price / 50) * qty) : 0);
     }, 0),
   [cart, products]);
 
   const binanceUsdAmount = useMemo(() => {
-    const rate = Number(settings.usdt_rate) > 0 ? Number(settings.usdt_rate) : 50;
-    const totalLocal = isCheckoutFromCart ? cartTotal : (selectedProductForBuy ? Number(selectedProductForBuy.price || 0) : 0);
-    const converted = totalLocal / rate;
-    return Math.max(0.01, Number(converted.toFixed(2)));
-  }, [isCheckoutFromCart, cartTotal, selectedProductForBuy, settings.usdt_rate]);
+    if (isCheckoutFromCart) {
+      return Math.max(0.01, Number(cartTotalUsd.toFixed(2)));
+    }
+    const val = activeSingleBuyPriceUsd > 0 ? activeSingleBuyPriceUsd : (activeSingleBuyPrice / 50);
+    return Math.max(0.01, Number(val.toFixed(2)));
+  }, [isCheckoutFromCart, cartTotalUsd, activeSingleBuyPriceUsd, activeSingleBuyPrice]);
 
   function showToast(msg: string) {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(""), 3500);
   }
 
-  function addToCart(id: string) {
-    setCart((c) => ({ ...c, [id]: (c[id] ?? 0) + 1 }));
+  function addToCart(id: string, planIdx?: number | null) {
+    const p = products.find(x => x.id === id);
+    const pIdx = planIdx !== undefined && planIdx !== null ? planIdx : (p?.plans && p.plans.length > 0 ? 0 : null);
+    const key = pIdx !== null ? `${id}__plan_${pIdx}` : id;
+    setCart((c) => ({ ...c, [key]: (c[key] ?? 0) + 1 }));
     showToast("تمت إضافة المنتج إلى سلة المشتريات بنجاح! 🛍️");
   }
+
   function decreaseQuantity(id: string) { setCart((c) => { const qty = c[id]; if (!qty) return c; if (qty === 1) { const newCart = { ...c }; delete newCart[id]; return newCart; } return { ...c, [id]: qty - 1 }; }); }
   function removeFromCart(id: string) { setCart((c) => { const newCart = { ...c }; delete newCart[id]; return newCart; }); }
-  function handleDirectBuy(product: Product) { setSelectedProductForBuy(product); setIsCheckoutFromCart(false); setIsPaymentModalOpen(true); }
+  function handleDirectBuy(product: Product) { setSelectedProductForBuy(product); setSelectedPlanIndex(0); setIsCheckoutFromCart(false); setIsPaymentModalOpen(true); }
   function handleCartCheckoutClick() { if (cartCount === 0) return; setIsCheckoutFromCart(true); setSelectedProductForBuy(null); setIsPaymentModalOpen(true); setIsCartOpen(false); }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -307,16 +386,16 @@ export default function Home() {
       amount = cartTotal;
       prodId = "cart";
       prodName = Object.entries(cart)
-        .map(([id, qty]) => {
-          const p = products.find(x => x.id === id);
-          return p ? `${p.name} (x${qty})` : "";
+        .map(([k, qty]) => {
+          const info = getCartItemInfo(k, products);
+          return info ? `${info.name} (x${qty})` : "";
         })
         .filter(Boolean)
         .join(" + ");
     } else if (selectedProductForBuy) {
-      amount = Number(selectedProductForBuy.price) || 0;
+      amount = activeSingleBuyPrice;
       prodId = String(selectedProductForBuy.id || selectedProductForBuy.sku || "");
-      prodName = selectedProductForBuy.name;
+      prodName = activeSingleBuyName;
     }
 
     let receiptUrl = "";
@@ -354,13 +433,13 @@ export default function Home() {
     const methodLabel = transferMethod === "instapay" ? "⚡ إنستاباي (InstaPay)" : "🔴 فودافون كاش (Vodafone Cash)";
     let orderText = `السلام عليكم ورحمة الله وبركاتة\nأرغب في تأكيد طلب شراء:\n`;
     if (isCheckoutFromCart) {
-      Object.entries(cart).forEach(([id, qty]) => {
-        const p = products.find(x => x.id === id);
-        if (p) orderText += `- ${p.name} x${qty}\n`;
+      Object.entries(cart).forEach(([k, qty]) => {
+        const info = getCartItemInfo(k, products);
+        if (info) orderText += `- ${info.name} x${qty}\n`;
       });
-      orderText += `\nالإجمالي الكلي:${cartTotal} ${settings.currency || "ج.م"}\nطريقة التحويل:${methodLabel}\nرقم الهاتف المحول منه:${senderPhone}`;
+      orderText += `\nالإجمالي الكلي: ${cartTotal} ${settings.currency || "ج.م"}\nطريقة التحويل: ${methodLabel}\nرقم الهاتف المحول منه: ${senderPhone}`;
     } else if (selectedProductForBuy) {
-      orderText += `-${selectedProductForBuy.name}\nالسعر:${selectedProductForBuy.price} ${settings.currency || "ج.م"}\nطريقة التحويل:${methodLabel}\nرقم الهاتف المحول منه:${senderPhone}`;
+      orderText += `- ${activeSingleBuyName}\nالسعر: ${activeSingleBuyPrice} ${settings.currency || "ج.م"}\nطريقة التحويل: ${methodLabel}\nرقم الهاتف المحول منه: ${senderPhone}`;
     }
 
     if (receiptUrl) {
@@ -483,15 +562,15 @@ export default function Home() {
 
     // Create a pending crypto order in backend
     try {
-      let prodName = selectedProductForBuy?.name || "اشتراك AI";
+      let prodName = activeSingleBuyName || "اشتراك AI";
       let prodId = selectedProductForBuy?.id || "product";
 
       if (isCheckoutFromCart) {
         prodId = "cart";
         const items = Object.entries(cart)
-          .map(([id, qty]) => {
-            const p = products.find((x) => x.id === id);
-            return p ? `${p.name} (x${qty})` : "";
+          .map(([k, qty]) => {
+            const info = getCartItemInfo(k, products);
+            return info ? `${info.name} (x${qty})` : "";
           })
           .filter(Boolean)
           .join(" + ");
@@ -615,15 +694,15 @@ export default function Home() {
 
     let hasItems = false;
     if (isCheckoutFromCart && Object.keys(cart).length > 0) {
-      Object.entries(cart).forEach(([id, qty]) => {
-        const p = products.find((x) => x.id === id);
-        if (p) {
-          text += `${p.name} x${qty}\n`;
+      Object.entries(cart).forEach(([k, qty]) => {
+        const info = getCartItemInfo(k, products);
+        if (info) {
+          text += `${info.name} x${qty}\n`;
           hasItems = true;
         }
       });
     } else if (selectedProductForBuy) {
-      text += `${selectedProductForBuy.name}\n`;
+      text += `${activeSingleBuyName}\n`;
       hasItems = true;
     }
 
@@ -682,7 +761,15 @@ export default function Home() {
           <div className="h-full w-full" style={{ backgroundImage: "repeating-linear-gradient(-45deg, #E8A33D 0, #E8A33D 2px, transparent 2px, transparent 25px)" }} />
         </div>
         <div className="mx-auto max-w-5xl px-6 text-center flex flex-col items-center">
-          <h2 className="mb-3 font-display text-3xl tracking-[0.2em] text-[#E8A33D] font-bold drop-shadow-[0_2px_10px_rgba(232,163,61,0.5)]">{settings.website_name || "AI STORE"}</h2>
+          <div className="mb-5 relative flex items-center justify-center">
+            <div className="absolute -inset-1.5 rounded-full bg-gradient-to-tr from-[#E8A33D] to-[#ffcc70] opacity-35 blur-md animate-pulse" />
+            <img 
+              src="/logo.png" 
+              alt={settings.website_name || "AI PRO EGYPT"} 
+              className="relative h-24 w-24 sm:h-28 sm:w-28 rounded-full object-contain shadow-[0_10px_35px_rgba(0,0,0,0.9)] border-2 border-[#E8A33D]/60 p-1 bg-black/60 backdrop-blur-xl transition-transform duration-300 hover:scale-105" 
+            />
+          </div>
+          <h2 className="mb-3 font-display text-2xl sm:text-3xl tracking-[0.2em] text-[#E8A33D] font-bold drop-shadow-[0_2px_10px_rgba(232,163,61,0.5)]">{settings.website_name || "AI STORE"}</h2>
           <h1 className="font-display text-4xl font-extrabold leading-tight text-white sm:text-5xl drop-shadow-[0_5px_15px_rgba(0,0,0,0.9)]">{settings.hero_title}</h1>
           <p className="mt-4 max-w-3xl text-base text-white/70">{settings.hero_description}</p>
           <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
@@ -753,16 +840,45 @@ export default function Home() {
       </header>
 
       {/* المنتجات */}
-      <section className="mx-auto max-w-7xl px-4 sm:px-6 py-14">
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+      <section id="products" className="mx-auto max-w-7xl px-4 sm:px-6 py-14">
+        {isLoadingProducts && products.length === 0 ? (
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+            {[...Array(8)].map((_, i) => (
+              <div 
+                key={i} 
+                className="flex flex-col overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-[#1a1f2c]/50 to-[#11141d]/50 p-5 space-y-4 shadow-[0_15px_35px_rgba(0,0,0,0.8)] animate-pulse"
+              >
+                <div className="h-48 w-full rounded-2xl bg-white/[0.04] border border-white/5 flex items-center justify-center">
+                  <div className="h-16 w-16 rounded-2xl bg-white/[0.05]" />
+                </div>
+                <div className="space-y-2.5 flex flex-col items-center pt-2">
+                  <div className="h-5 w-3/4 rounded-xl bg-white/15" />
+                  <div className="h-4 w-1/3 rounded-lg bg-[#E8A33D]/25" />
+                  <div className="h-3 w-5/6 rounded-md bg-white/5 mt-1" />
+                </div>
+                <div className="pt-3 mt-auto grid grid-cols-2 gap-2">
+                  <div className="h-11 rounded-2xl bg-white/10" />
+                  <div className="h-11 rounded-2xl bg-[#E8A33D]/20" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : products.length === 0 ? (
+          <div className="flex min-h-[320px] flex-col items-center justify-center gap-3 rounded-3xl border border-white/10 bg-black/40 p-12 text-center">
+            <span className="text-4xl">🛍️</span>
+            <h3 className="text-lg font-bold text-white">لا توجد منتجات معروضة حالياً</h3>
+            <p className="text-sm text-white/60">يرجى التحقق لاحقاً أو مراجعة لوحة التحكم لإضافة منتجات جديدة.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
           {products.map((p) => {
             const isOutOfStock = p.stock !== undefined && p.stock !== null && Number(p.stock) <= 0;
             return (
               <article 
                 key={p.id} 
-                className="flex flex-col overflow-hidden rounded-3xl border border-white/15 bg-gradient-to-b from-[#1a1f2c] to-[#11141d] shadow-[0_15px_35px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.1)] transition-all duration-300 hover:scale-[1.02] hover:border-[#E8A33D]/60 hover:shadow-[0_20px_40px_rgba(232,163,61,0.2)]"
+                className="flex flex-col h-full overflow-hidden rounded-3xl border border-white/15 bg-gradient-to-b from-[#1a1f2c] to-[#11141d] shadow-[0_15px_35px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.1)] transition-all duration-300 hover:scale-[1.02] hover:border-[#E8A33D]/60 hover:shadow-[0_20px_40px_rgba(232,163,61,0.2)]"
               >
-                <Link href={`/products/${p.id}`} className="h-48 sm:h-52 w-full relative overflow-hidden bg-black flex items-center justify-center p-4 group">
+                <Link href={`/products/${p.id}`} className="h-52 sm:h-56 w-full relative overflow-hidden bg-black flex items-center justify-center p-4 group shrink-0">
                   {/* Top floating Sales Count indicator badge */}
                   <div className="absolute top-3.5 right-3.5 z-10 inline-flex items-center rounded-full bg-black/85 backdrop-blur-md border border-white/20 px-3.5 py-1.5 sm:px-3 sm:py-1 text-xs font-bold text-white shadow-[0_6px_20px_rgba(0,0,0,0.9)]">
                     <span dir="rtl">المبيعات <strong className="text-[#E8A33D] font-mono text-sm font-black">{(Number(p.fake_sales_count) || 0) + (Number(p.sales_count) || 0)}</strong></span>
@@ -782,19 +898,39 @@ export default function Home() {
                     onError={(e) => { e.currentTarget.style.display = 'none'; }} 
                   />
                 </Link>
-                <div className="flex flex-col items-center text-center gap-2 p-5 pb-3">
-                  <Link href={`/products/${p.id}`} className="group hover:text-[#E8A33D] transition">
-                    <h2 className="font-display text-xl sm:text-2xl font-bold text-white drop-shadow-md group-hover:text-[#E8A33D] transition">{p.name}</h2>
+                <div className="flex flex-col items-center text-center gap-2 p-5 pb-3.5 flex-1">
+                  <Link href={`/products/${p.id}`} className="group hover:text-[#E8A33D] transition w-full">
+                    <h2 className="font-display text-lg sm:text-xl font-bold text-white drop-shadow-md group-hover:text-[#E8A33D] transition truncate">{p.name}</h2>
                   </Link>
-                  <div className="font-display text-lg sm:text-xl font-extrabold text-[#E8A33D] drop-shadow-[0_2px_8px_rgba(232,163,61,0.4)]">
-                    {formatPrice(p.price, settings.currency, Number(settings.usdt_rate))}
+                  <div className="font-display text-base sm:text-lg font-extrabold text-[#E8A33D] drop-shadow-[0_2px_8px_rgba(232,163,61,0.4)] min-h-[44px] flex flex-col items-center justify-center">
+                    {p.plans && p.plans.length > 0 ? (
+                      <div className="flex flex-col items-center gap-0.5">
+                        <span className="text-[10px] text-white/50 font-sans font-normal leading-none">يبدأ من</span>
+                        {formatPrice(
+                          Math.min(...p.plans.map((x) => x.price)),
+                          Math.min(...p.plans.map((x) => x.price_usd || 0)),
+                          settings.currency
+                        )}
+                      </div>
+                    ) : (
+                      formatPrice(p.price, p.price_usd, settings.currency)
+                    )}
                   </div>
-                  <p className="mt-1 text-sm sm:text-[15px] font-medium text-white/85 line-clamp-2 leading-relaxed">{p.detail}</p>
+                  <div className="min-h-[24px] flex items-center justify-center">
+                    {p.plans && p.plans.length > 0 ? (
+                      <span className="inline-block rounded-full bg-[#E8A33D]/15 border border-[#E8A33D]/30 px-2.5 py-0.5 text-[11px] font-bold text-[#E8A33D]">
+                        ⚡ {p.plans.length} باقات متوفرة
+                      </span>
+                    ) : (
+                      <span className="text-[11px] text-white/30 font-medium">باقة أساسية</span>
+                    )}
+                  </div>
+                  <p className="text-sm sm:text-[15px] font-medium text-white/85 line-clamp-2 leading-relaxed min-h-[44px] max-h-[48px] overflow-hidden">{p.detail || p.description}</p>
                   <Link
                     href={`/products/${p.id}`}
-                    className="mt-1 inline-flex items-center gap-1.5 text-xs font-extrabold text-[#E8A33D] hover:underline hover:text-[#ffcc70] transition"
+                    className="mt-auto inline-flex items-center gap-1.5 text-xs font-extrabold text-[#E8A33D] hover:underline hover:text-[#ffcc70] transition pt-1.5"
                   >
-                    <span>عرض التفاصيل الكاملة</span>
+                    <span>عرض التفاصيل والمدد</span>
                     <span className="text-xs">←</span>
                   </Link>
                 </div>
@@ -827,6 +963,7 @@ export default function Home() {
             );
           })}
         </div>
+        )}
       </section>
 
       {/* سلة المشتريات (بعد تعديل الأسعار) */}
@@ -847,35 +984,38 @@ export default function Home() {
             <div className="p-6 overflow-y-auto flex-1 space-y-4 overscroll-contain touch-pan-y">
               {cartCount === 0 ? <div className="text-center text-white/50 py-12 text-lg">السلة فارغة حالياً</div> : 
                 <div className="flex flex-col gap-4">
-                  {Object.entries(cart).map(([id, qty]) => {
-                    const p = products.find(x => x.id === id);
-                    if (!p) return null;
+                  {Object.entries(cart).map(([cartKey, qty]) => {
+                    const itemInfo = getCartItemInfo(cartKey, products);
+                    if (!itemInfo) return null;
                     return (
-                      <div key={id} className="flex flex-col bg-white/[0.04] p-4 rounded-2xl border border-white/10 shadow-[0_8px_20px_rgba(0,0,0,0.4)]">
+                      <div key={cartKey} className="flex flex-col bg-white/[0.04] p-4 rounded-2xl border border-white/10 shadow-[0_8px_20px_rgba(0,0,0,0.4)]">
                         <div className="flex items-start justify-between">
                           <div className="flex items-center gap-3">
-                            <img src={p.image} alt={p.name} className="w-12 h-12 object-contain bg-black/60 rounded-xl p-1 border border-white/10" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                            <img src={itemInfo.image || "/p3.png"} alt={itemInfo.name} className="w-12 h-12 object-contain bg-black/60 rounded-xl p-1 border border-white/10" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                             <div>
-                              <h4 className="text-white font-bold text-base">{p.name}</h4>
+                              <h4 className="text-white font-bold text-base">{itemInfo.name}</h4>
                               <div className="text-[#E8A33D] text-xs font-semibold mt-1">
-                                {formatPrice(p.price, settings.currency, Number(settings.usdt_rate))}
+                                {formatPrice(itemInfo.price, itemInfo.price_usd, settings.currency)}
                               </div>
                             </div>
                           </div>
-                          <button onClick={() => removeFromCart(id)} className="text-red-400 p-2 hover:bg-red-500/10 rounded-xl transition"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
+                          <button onClick={() => removeFromCart(cartKey)} className="text-red-400 p-2 hover:bg-red-500/10 rounded-xl transition"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
                         </div>
                         <div className="flex items-center justify-between mt-4 pt-3 border-t border-white/5">
                           <div className="flex items-center bg-black/60 rounded-xl p-1 border border-white/10 shadow-inner">
-                            <button onClick={() => decreaseQuantity(id)} className="w-9 h-9 text-white font-bold hover:text-[#E8A33D] transition">-</button>
+                            <button onClick={() => decreaseQuantity(cartKey)} className="w-9 h-9 text-white font-bold hover:text-[#E8A33D] transition">-</button>
                             <span className="w-10 text-center text-white font-extrabold">{qty}</span>
-                            <button onClick={() => addToCart(id)} className="w-9 h-9 text-white font-bold hover:text-[#E8A33D] transition">+</button>
+                            <button onClick={() => {
+                              const { baseId, planIndex } = parseCartKey(cartKey);
+                              addToCart(baseId, planIndex);
+                            }} className="w-9 h-9 text-white font-bold hover:text-[#E8A33D] transition">+</button>
                           </div>
                           <div className="text-[#E8A33D] font-extrabold text-sm">
-                             {formatPrice(typeof p.price === 'number' ? p.price * qty : 0, settings.currency, Number(settings.usdt_rate))}
+                             {formatPrice(itemInfo.price * qty, itemInfo.price_usd * qty, settings.currency)}
                           </div>
                         </div>
                       </div>
-                    )
+                    );
                   })}
                 </div>
               }
@@ -887,7 +1027,7 @@ export default function Home() {
                   <span className="font-bold text-xl text-white">الإجمالي الكلي:</span>
                   <div className="text-right flex flex-col items-end">
                     <span className="font-extrabold text-2xl text-[#E8A33D] drop-shadow">
-                      {formatPrice(cartTotal, settings.currency, Number(settings.usdt_rate))}
+                      {formatPrice(cartTotal, cartTotalUsd, settings.currency)}
                     </span>
                   </div>
                 </div>
@@ -904,6 +1044,39 @@ export default function Home() {
           <div className="bg-gradient-to-b from-[#191e2b] to-[#11141e] border-2 border-[#E8A33D]/40 rounded-3xl w-full max-w-md p-8 shadow-[0_30px_60px_rgba(0,0,0,0.95)] flex flex-col gap-5 text-center">
             <h3 className="text-3xl font-extrabold text-white drop-shadow-md mb-1">اختر طريقة الدفع</h3>
             <p className="text-white/70 text-sm mb-2">اختر الدفع الفوري عبر بينانس، أو التحويل اليدوي عبر فودافون كاش / إنستاباي</p>
+
+            {/* If product has multiple plans, allow quick duration selection */}
+            {selectedProductForBuy && selectedProductForBuy.plans && selectedProductForBuy.plans.length > 0 && (
+              <div className="space-y-2 text-right bg-black/50 p-3.5 rounded-2xl border border-white/10 shadow-inner" dir="rtl">
+                <label className="text-xs font-bold text-white flex items-center justify-between">
+                  <span className="flex items-center gap-1.5"><span className="text-[#E8A33D]">⚡</span> اختر مدة الاشتراك:</span>
+                  <span className="text-[10px] text-white/40">{selectedProductForBuy.plans.length} باقات</span>
+                </label>
+                <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto pr-1">
+                  {selectedProductForBuy.plans.map((plan, idx) => {
+                    const isSel = selectedPlanIndex === idx;
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setSelectedPlanIndex(idx)}
+                        className={`p-2.5 rounded-xl border text-right transition ${
+                          isSel
+                            ? "border-[#E8A33D] bg-[#E8A33D]/20 text-white font-bold ring-1 ring-[#E8A33D]"
+                            : "border-white/10 bg-black/40 text-white/70 hover:border-white/20"
+                        }`}
+                      >
+                        <div className="text-xs font-bold">{plan.name}</div>
+                        <div className="text-xs font-extrabold text-[#E8A33D] flex items-center justify-end gap-1">
+                          <span>{plan.price} {settings.currency || "ج.م"}</span>
+                          {plan.price_usd ? <span className="text-emerald-400 font-mono">/ {plan.price_usd}$</span> : null}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* زر Binance */}
             <button 
@@ -1418,6 +1591,17 @@ export default function Home() {
         <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
         {cartCount > 0 && <span className="absolute -top-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-red-600 text-xs text-white font-black border-2 border-[#10131A] shadow-lg animate-pulse">{cartCount}</span>}
       </button>
+
+      {/* Footer */}
+      <footer className="mt-20 border-t border-white/10 bg-black/40 py-10 text-center text-xs text-white/50 flex flex-col items-center gap-3">
+        <img 
+          src="/logo.png" 
+          alt={settings.website_name || "AI PRO EGYPT"} 
+          className="h-12 w-12 rounded-full object-contain border border-[#E8A33D]/40 p-0.5 bg-black/50" 
+        />
+        <p className="font-semibold text-white/80">{settings.website_name || "AI STORE"}</p>
+        <p>© {new Date().getFullYear()} — جميع الحقوق محفوظة.</p>
+      </footer>
     </main>
   );
 }

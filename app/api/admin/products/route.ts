@@ -9,6 +9,20 @@ async function requireAdmin(req: NextRequest) {
   return admin;
 }
 
+function sanitizePlans(plans: any) {
+  if (!Array.isArray(plans)) return [];
+  return plans
+    .filter((p) => p && typeof p === "object" && p.name && (Number(p.price) > 0 || p.price !== undefined || Number(p.price_usd) > 0))
+    .map((p) => ({
+      name: String(p.name).trim(),
+      price: Number(p.price) || 0,
+      price_usd: Number(p.price_usd) || 0,
+      original_price: Number(p.original_price) || 0,
+      original_price_usd: Number(p.original_price_usd) || 0,
+      discount_badge: p.discount_badge ? String(p.discount_badge).trim() : "",
+    }));
+}
+
 export async function GET(req: NextRequest) {
   try {
     await requireAdmin(req);
@@ -24,7 +38,9 @@ export async function GET(req: NextRequest) {
         name: p.name,
         description: p.description || "",
         price: p.price,
+        price_usd: p.price_usd !== undefined ? p.price_usd : 0,
         original_price: p.original_price,
+        original_price_usd: p.original_price_usd !== undefined ? p.original_price_usd : 0,
         discount_enabled: p.discount_enabled,
         discount_percentage: p.discount_percentage,
         featured: p.featured,
@@ -41,6 +57,7 @@ export async function GET(req: NextRequest) {
         fake_sales_count: Number(p.fake_sales_count) || 0,
         long_description: p.long_description || p.description || "",
         warranty: p.warranty || "",
+        plans: sanitizePlans(p.plans),
       }))
     );
   } catch {
@@ -59,7 +76,9 @@ export async function POST(req: NextRequest) {
       long_description,
       warranty,
       price,
+      price_usd,
       original_price,
+      original_price_usd,
       discount_enabled,
       discount_percentage,
       featured,
@@ -73,11 +92,14 @@ export async function POST(req: NextRequest) {
       tags,
       sales_count,
       fake_sales_count,
+      plans,
     } = body;
 
     if (!name) {
       return NextResponse.json({ error: "Name is required." }, { status: 400 });
     }
+
+    const cleanPlans = sanitizePlans(plans);
 
     const db = await getDb();
     const result = await db.collection("products").insertOne({
@@ -86,8 +108,10 @@ export async function POST(req: NextRequest) {
       description: description || "",
       long_description: long_description || description || "",
       warranty: warranty || "",
-      price: Number(price) || 0,
-      original_price: Number(original_price) || 0,
+      price: cleanPlans.length > 0 ? cleanPlans[0].price : Number(price) || 0,
+      price_usd: cleanPlans.length > 0 && cleanPlans[0].price_usd ? cleanPlans[0].price_usd : Number(price_usd) || 0,
+      original_price: cleanPlans.length > 0 && cleanPlans[0].original_price ? cleanPlans[0].original_price : Number(original_price) || 0,
+      original_price_usd: cleanPlans.length > 0 && cleanPlans[0].original_price_usd ? cleanPlans[0].original_price_usd : Number(original_price_usd) || 0,
       discount_enabled: discount_enabled ? 1 : 0,
       discount_percentage: Number(discount_percentage) || 0,
       featured: featured ? 1 : 0,
@@ -101,6 +125,7 @@ export async function POST(req: NextRequest) {
       tags: tags || "",
       sales_count: Number(sales_count) || 0,
       fake_sales_count: Number(fake_sales_count) || 0,
+      plans: cleanPlans,
       createdAt: new Date(),
     });
 
@@ -122,7 +147,9 @@ export async function PUT(req: NextRequest) {
       long_description,
       warranty,
       price,
+      price_usd,
       original_price,
+      original_price_usd,
       discount_enabled,
       discount_percentage,
       featured,
@@ -136,11 +163,14 @@ export async function PUT(req: NextRequest) {
       tags,
       sales_count,
       fake_sales_count,
+      plans,
     } = body;
 
     if (!id || !name) {
       return NextResponse.json({ error: "ID and name are required." }, { status: 400 });
     }
+
+    const cleanPlans = sanitizePlans(plans);
 
     const db = await getDb();
     const query = ObjectId.isValid(id) ? { _id: new ObjectId(id) } : { sku: id };
@@ -152,8 +182,10 @@ export async function PUT(req: NextRequest) {
         description: description || "",
         long_description: long_description || description || "",
         warranty: warranty || "",
-        price: Number(price) || 0,
-        original_price: Number(original_price) || 0,
+        price: cleanPlans.length > 0 ? cleanPlans[0].price : Number(price) || 0,
+        price_usd: cleanPlans.length > 0 && cleanPlans[0].price_usd ? cleanPlans[0].price_usd : Number(price_usd) || 0,
+        original_price: cleanPlans.length > 0 && cleanPlans[0].original_price ? cleanPlans[0].original_price : Number(original_price) || 0,
+        original_price_usd: cleanPlans.length > 0 && cleanPlans[0].original_price_usd ? cleanPlans[0].original_price_usd : Number(original_price_usd) || 0,
         discount_enabled: discount_enabled ? 1 : 0,
         discount_percentage: Number(discount_percentage) || 0,
         featured: featured ? 1 : 0,
@@ -167,6 +199,7 @@ export async function PUT(req: NextRequest) {
         tags: tags || "",
         sales_count: Number(sales_count) || 0,
         fake_sales_count: Number(fake_sales_count) || 0,
+        plans: cleanPlans,
         updatedAt: new Date(),
       },
     });

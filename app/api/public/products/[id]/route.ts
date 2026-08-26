@@ -48,7 +48,9 @@ export async function GET(
       detail: rawProduct.description || "",
       long_description: rawProduct.long_description || rawProduct.description || "",
       price: rawProduct.price,
+      price_usd: rawProduct.price_usd !== undefined ? rawProduct.price_usd : 0,
       original_price: rawProduct.original_price,
+      original_price_usd: rawProduct.original_price_usd !== undefined ? rawProduct.original_price_usd : 0,
       discount_enabled: rawProduct.discount_enabled,
       discount_percentage: rawProduct.discount_percentage,
       featured: rawProduct.featured,
@@ -64,6 +66,7 @@ export async function GET(
       sales_count: Number(rawProduct.sales_count) || 0,
       fake_sales_count: Number(rawProduct.fake_sales_count) || 0,
       warranty: rawProduct.warranty || "",
+      plans: Array.isArray(rawProduct.plans) ? rawProduct.plans : [],
     };
 
     return NextResponse.json(product, {

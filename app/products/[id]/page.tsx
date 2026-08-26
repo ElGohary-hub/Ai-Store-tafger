@@ -4,15 +4,26 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 
-type Product = {
-  id: string;
-  sku?: string;
+type SubscriptionPlan = {
   name: string;
-  description?: string;
+  price: number;
+  price_usd?: number;
+  original_price?: number;
+  original_price_usd?: number;
+  discount_badge?: string;
+};
+
+type Product = {
+  id: string | number;
+  sku: string;
+  name: string;
+  description: string;
   detail?: string;
   long_description?: string;
   price: number | string;
+  price_usd?: number;
   original_price?: number;
+  original_price_usd?: number;
   discount_enabled?: number;
   discount_percentage?: number;
   featured?: number;
@@ -28,6 +39,7 @@ type Product = {
   sales_count?: number;
   fake_sales_count?: number;
   warranty?: string;
+  plans?: SubscriptionPlan[];
 };
 
 type SettingsState = {
@@ -66,18 +78,52 @@ const DEFAULT_SETTINGS: SettingsState = {
   usdt_rate: "50",
 };
 
-function formatPrice(p: number | string, currency = "ج.م", usdtRate = 50) {
-  if (typeof p === "number") {
-    const rate = usdtRate > 0 ? usdtRate : 50;
-    const usdtPrice = (p / rate).toFixed(2);
-    return `${p} ${currency} / ${usdtPrice}$`;
+function formatPrice(pEgp: number | string, pUsd?: number | string, currency = "ج.م") {
+  const numEgp = typeof pEgp === "number" ? pEgp : parseFloat(pEgp as string) || 0;
+  const numUsd = pUsd !== undefined ? (typeof pUsd === "number" ? pUsd : parseFloat(pUsd as string) || 0) : 0;
+  if (numUsd > 0) {
+    return `${numEgp} ${currency} / ${numUsd}$`;
   }
-  return p;
+  return `${numEgp} ${currency}`;
+}
+
+function parseCartKey(key: string) {
+  if (key.includes("__plan_")) {
+    const [baseId, planIdxStr] = key.split("__plan_");
+    return { baseId, planIndex: parseInt(planIdxStr, 10) };
+  }
+  return { baseId: key, planIndex: null };
+}
+
+function getCartItemInfo(cartKey: string, allProductsList: Product[], currentProd: Product | null) {
+  const { baseId, planIndex } = parseCartKey(cartKey);
+  const p = allProductsList.find((item) => String(item.id) === baseId) || (currentProd && String(currentProd.id) === baseId ? currentProd : null);
+  if (!p) return null;
+
+  if (planIndex !== null && p.plans && p.plans[planIndex]) {
+    const plan = p.plans[planIndex];
+    return {
+      product: p,
+      name: `${p.name} (${plan.name})`,
+      price: Number(plan.price) || 0,
+      price_usd: plan.price_usd !== undefined ? Number(plan.price_usd) : 0,
+      image: p.image,
+      stock: p.stock,
+    };
+  }
+
+  return {
+    product: p,
+    name: p.name,
+    price: typeof p.price === "number" ? p.price : parseFloat(p.price as string) || 0,
+    price_usd: p.price_usd !== undefined ? Number(p.price_usd) : 0,
+    image: p.image,
+    stock: p.stock,
+  };
 }
 
 export default function ProductDetailsPage() {
   const params = useParams();
-  const router = useRouter();
   const productId = params?.id as string;
 
   const [product, setProduct] = useState<Product | null>(null);
@@ -85,6 +131,15 @@ export default function ProductDetailsPage() {
   const [settings, setSettings] = useState<SettingsState>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [selectedPlanIndex, setSelectedPlanIndex] = useState<number>(0);
+
+  const hasPlans = Boolean(product?.plans && product.plans.length > 0);
+  const currentPlan = hasPlans && product?.plans ? product.plans[selectedPlanIndex] || product.plans[0] : null;
+  const activePrice = currentPlan ? Number(currentPlan.price) : (typeof product?.price === "number" ? product.price : parseFloat(product?.price as string) || 0);
+  const activePriceUsd = currentPlan ? Number(currentPlan.price_usd || 0) : Number(product?.price_usd || 0);
+  const activeOriginalPrice = currentPlan?.original_price ? Number(currentPlan.original_price) : Number(product?.original_price || 0);
+  const activeOriginalPriceUsd = currentPlan?.original_price_usd ? Number(currentPlan.original_price_usd) : Number(product?.original_price_usd || 0);
+  const activeProductName = currentPlan ? `${product?.name} (${currentPlan.name})` : (product?.name || "");
 
   // Payment Modals States (Identical to Homepage)
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -166,14 +221,38 @@ export default function ProductDetailsPage() {
   }, [isCartOpen, isPaymentModalOpen, isVodafoneModalOpen, isBinanceModalOpen]);
 
   useEffect(() => {
+    // 1. Instant Cache Hydration: If cached data exists in sessionStorage, render it instantly (0ms delay)
+    try {
+      const cachedSetts = sessionStorage.getItem("ai_store_cached_settings");
+      if (cachedSetts) {
+        const s = JSON.parse(cachedSetts);
+        if (s && typeof s === "object") setSettings((prev) => ({ ...prev, ...s }));
+      }
+      const cachedProds = sessionStorage.getItem("ai_store_cached_products");
+      if (cachedProds) {
+        const prods: Product[] = JSON.parse(cachedProds);
+        if (Array.isArray(prods) && prods.length > 0) {
+          setAllProducts(prods);
+          const found = prods.find((item) => item.id === productId || item.sku === productId);
+          if (found) {
+            setProduct(found);
+            setLoading(false);
+          }
+        }
+      }
+    } catch {}
+
+    // 2. Fetch fresh live data from database in background
     async function loadData() {
       try {
-        setLoading(true);
         // Load Settings
         const settingsRes = await fetch("/api/public/settings");
         if (settingsRes.ok) {
           const s = await settingsRes.json();
           setSettings((prev) => ({ ...prev, ...s }));
+          try {
+            sessionStorage.setItem("ai_store_cached_settings", JSON.stringify(s));
+          } catch {}
         }
 
         // Load Product
@@ -203,6 +282,9 @@ export default function ProductDetailsPage() {
         if (allRes.ok) {
           const all: Product[] = await allRes.json();
           setAllProducts(all);
+          try {
+            sessionStorage.setItem("ai_store_cached_products", JSON.stringify(all));
+          } catch {}
         }
 
         // Load Crypto addresses
@@ -216,8 +298,7 @@ export default function ProductDetailsPage() {
           }
         }
       } catch (err: any) {
-        console.error(err);
-        setError("حدث خطأ أثناء تحميل بيانات المنتج.");
+        console.error("Failed to load product data:", err);
       } finally {
         setLoading(false);
       }
@@ -304,28 +385,32 @@ export default function ProductDetailsPage() {
     setTimeout(() => setToastMessage(""), 3500);
   }
 
-  function addToCart(id: string) {
-    setCart((prev) => ({ ...prev, [id]: (prev[id] ?? 0) + 1 }));
+  function addToCart(id: string | number, planIdx?: number | null) {
+    const pIdx = planIdx !== undefined && planIdx !== null ? planIdx : (hasPlans ? selectedPlanIndex : null);
+    const key = pIdx !== null ? `${String(id)}__plan_${pIdx}` : String(id);
+    setCart((prev) => ({ ...prev, [key]: (prev[key] ?? 0) + 1 }));
     showToast("تمت إضافة المنتج إلى سلة المشتريات بنجاح! 🛍️");
   }
 
-  function decreaseQuantity(id: string) {
+  function decreaseQuantity(id: string | number) {
+    const key = String(id);
     setCart((c) => {
-      const qty = c[id];
+      const qty = c[key];
       if (!qty) return c;
       if (qty === 1) {
         const newCart = { ...c };
-        delete newCart[id];
+        delete newCart[key];
         return newCart;
       }
-      return { ...c, [id]: qty - 1 };
+      return { ...c, [key]: qty - 1 };
     });
   }
 
-  function removeFromCart(id: string) {
+  function removeFromCart(id: string | number) {
+    const key = String(id);
     setCart((c) => {
       const newCart = { ...c };
-      delete newCart[id];
+      delete newCart[key];
       return newCart;
     });
   }
@@ -345,10 +430,16 @@ export default function ProductDetailsPage() {
   const cartCount = useMemo(() => Object.values(cart).reduce((a, b) => a + b, 0), [cart]);
 
   const cartTotal = useMemo(() =>
-    Object.entries(cart).reduce((sum, [id, qty]) => {
-      const p = allProducts.find((item) => item.id === id) || (product?.id === id ? product : null);
-      const priceNum = p ? (typeof p.price === "number" ? p.price : parseFloat(p.price as string) || 0) : 0;
-      return sum + priceNum * qty;
+    Object.entries(cart).reduce((sum, [key, qty]) => {
+      const info = getCartItemInfo(key, allProducts, product);
+      return sum + (info ? info.price * qty : 0);
+    }, 0),
+  [cart, allProducts, product]);
+
+  const cartTotalUsd = useMemo(() =>
+    Object.entries(cart).reduce((sum, [key, qty]) => {
+      const info = getCartItemInfo(key, allProducts, product);
+      return sum + (info ? (info.price_usd > 0 ? info.price_usd * qty : (info.price / 50) * qty) : 0);
     }, 0),
   [cart, allProducts, product]);
 
@@ -361,13 +452,12 @@ export default function ProductDetailsPage() {
   }, [cryptoAddresses, selectedNetwork]);
 
   const binanceUsdAmount = useMemo(() => {
-    const rate = Number(settings.usdt_rate) > 0 ? Number(settings.usdt_rate) : 50;
-    const totalLocal = isCheckoutFromCart
-      ? cartTotal
-      : (product ? (typeof product.price === "number" ? product.price : parseFloat(product.price as string) || 0) : 0);
-    const converted = totalLocal / rate;
-    return Math.max(0.01, Number(converted.toFixed(2)));
-  }, [isCheckoutFromCart, cartTotal, product, settings.usdt_rate]);
+    if (isCheckoutFromCart) {
+      return Math.max(0.01, Number(cartTotalUsd.toFixed(2)));
+    }
+    const val = activePriceUsd > 0 ? activePriceUsd : (activePrice / 50);
+    return Math.max(0.01, Number(val.toFixed(2)));
+  }, [isCheckoutFromCart, cartTotalUsd, activePriceUsd, activePrice]);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     if (e.target.files && e.target.files[0]) {
@@ -441,13 +531,13 @@ export default function ProductDetailsPage() {
     } catch {}
 
     let pId = product?.id || "product";
-    let pName = product?.name || "اشتراك AI";
+    let pName = activeProductName || "اشتراك AI";
     if (isCheckoutFromCart) {
       pId = "cart";
       pName = Object.entries(cart)
-        .map(([id, qty]) => {
-          const p = allProducts.find((x) => x.id === id) || (product?.id === id ? product : null);
-          return p ? `${p.name} (x${qty})` : "";
+        .map(([k, qty]) => {
+          const info = getCartItemInfo(k, allProducts, product);
+          return info ? `${info.name} (x${qty})` : "";
         })
         .filter(Boolean)
         .join(" + ");
@@ -498,52 +588,30 @@ export default function ProductDetailsPage() {
     setVerificationResult(null);
     setPaymentAudit(null);
 
-    const orderId = currentCryptoOrder?.orderId;
-    if (!orderId) {
-      setVerificationError("يرجى إعادة المحاولة");
-      setIsVerifying(false);
-      return;
-    }
-
-    const currentClientFail = Number(localStorage.getItem("crypto_fail_count") || 0);
-
     try {
       const res = await fetch("/api/public/crypto/verify-payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          orderId,
-          txHash: txIdInput.trim() || undefined,
-          clientFailCount: currentClientFail,
+          txId: txIdInput.trim(),
+          orderId: currentCryptoOrder?.orderId,
+          expectedAmount: binanceUsdAmount,
+          customerPhone: senderPhone || "",
+          productName: currentCryptoOrder?.productName || activeProductName,
+          network: selectedNetwork,
         }),
       });
 
       const data = await res.json();
       setIsVerifying(false);
 
-      if (!res.ok || data.error) {
-        setVerificationError(data.error || data.message || "حدث خطأ أثناء الاتصال بالخادم.");
-        return;
-      }
-
-      if (data.retryAfterSeconds && data.retryAfterSeconds > 0) {
-        localStorage.setItem("crypto_fail_count", "1");
-        const until = Date.now() + data.retryAfterSeconds * 1000;
-        try {
-          localStorage.setItem("crypto_cooldown_until", String(until));
-        } catch {}
-        setRetryCooldown(data.retryAfterSeconds);
-      }
-
-      if (data.status === "failed_exhausted" || data.attemptsLeft === 0 || (!data.verified && currentClientFail >= 1)) {
-        setIsFailedExhausted(true);
-        setVerificationResult("exhausted");
-        const cooldownSec = data.retryAfterSeconds || 60;
-        setRetryCooldown(cooldownSec);
-        try {
-          localStorage.setItem("crypto_fail_count", "2");
-          localStorage.setItem("crypto_cooldown_until", String(Date.now() + cooldownSec * 1000));
-        } catch {}
+      if (!res.ok && res.status === 429) {
+        setRetryCooldown(data.cooldownRemaining || 30);
+        if (data.exhausted) {
+          setIsFailedExhausted(true);
+          setVerificationResult("exhausted");
+        }
+        setVerificationError(data.error || "يرجى الانتظار قبل إعادة الفحص.");
         return;
       }
 
@@ -592,16 +660,16 @@ export default function ProductDetailsPage() {
       amount = cartTotal;
       prodId = "cart";
       prodName = Object.entries(cart)
-        .map(([id, qty]) => {
-          const p = allProducts.find((x) => x.id === id) || (product?.id === id ? product : null);
-          return p ? `${p.name} (x${qty})` : "";
+        .map(([k, qty]) => {
+          const info = getCartItemInfo(k, allProducts, product);
+          return info ? `${info.name} (x${qty})` : "";
         })
         .filter(Boolean)
         .join(" + ");
     } else if (product) {
-      amount = Number(product.price) || 0;
+      amount = activePrice;
       prodId = String(product.id || product.sku || productId);
-      prodName = product.name;
+      prodName = activeProductName;
     }
 
     let receiptUrl = "";
@@ -639,13 +707,13 @@ export default function ProductDetailsPage() {
     const methodLabel = transferMethod === "instapay" ? "⚡ إنستاباي (InstaPay)" : "🔴 فودافون كاش (Vodafone Cash)";
     let orderText = `السلام عليكم ورحمة الله وبركاته\nأرغب في تأكيد طلب شراء:\n`;
     if (isCheckoutFromCart) {
-      Object.entries(cart).forEach(([id, qty]) => {
-        const p = allProducts.find((x) => x.id === id) || (product?.id === id ? product : null);
-        if (p) orderText += `- ${p.name} x${qty}\n`;
+      Object.entries(cart).forEach(([k, qty]) => {
+        const info = getCartItemInfo(k, allProducts, product);
+        if (info) orderText += `- ${info.name} x${qty}\n`;
       });
       orderText += `\nالإجمالي الكلي: ${cartTotal} ${settings.currency || "ج.م"}\nطريقة التحويل: ${methodLabel}\nرقم الهاتف المحول منه: ${senderPhone}`;
     } else if (product) {
-      orderText += `- ${product.name}\nالسعر: ${product.price} ${settings.currency || "ج.م"}\nطريقة التحويل: ${methodLabel}\nرقم الهاتف المحول منه: ${senderPhone}`;
+      orderText += `- ${activeProductName}\nالسعر: ${activePrice} ${settings.currency || "ج.م"}\nطريقة التحويل: ${methodLabel}\nرقم الهاتف المحول منه: ${senderPhone}`;
     }
 
     if (receiptUrl) {
@@ -659,7 +727,7 @@ export default function ProductDetailsPage() {
 
   function handleDirectWhatsApp() {
     if (!product) return;
-    const text = `مرحباً، أرغب في الاستفسار وشراء: ${product.name} بسعر ${product.price} ${settings.currency || "ج.م"}`;
+    const text = `مرحباً، أرغب في الاستفسار وشراء: ${activeProductName} بسعر ${activePrice} ${settings.currency || "ج.م"}`;
     window.open(`${settings.contact_whatsapp || "https://wa.me/201040248751?text="}${encodeURIComponent(text)}`, "_blank");
   }
 
@@ -683,10 +751,10 @@ export default function ProductDetailsPage() {
 
     let hasItems = false;
     if (isCheckoutFromCart && Object.keys(cart).length > 0) {
-      Object.entries(cart).forEach(([id, qty]) => {
-        const p = allProducts.find((x) => x.id === id) || (product?.id === id ? product : null);
-        if (p) {
-          text += `${p.name} x${qty}\n`;
+      Object.entries(cart).forEach(([k, qty]) => {
+        const info = getCartItemInfo(k, allProducts, product);
+        if (info) {
+          text += `${info.name} x${qty}\n`;
           hasItems = true;
         }
       });
@@ -749,9 +817,11 @@ export default function ProductDetailsPage() {
       <header className="sticky top-0 z-40 border-b border-white/10 bg-[#0a0c10]/85 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6">
           <Link href="/" className="flex items-center gap-3 group">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-tr from-[#E8A33D] to-[#ffcc70] text-[#10131A] font-black text-xl shadow-[0_0_20px_rgba(232,163,61,0.5)] transition-transform group-hover:scale-105">
-              ⚡
-            </div>
+            <img 
+              src="/logo.png" 
+              alt={settings.website_name || "AI PRO EGYPT"} 
+              className="h-10 w-10 sm:h-11 sm:w-11 rounded-full object-contain shadow-[0_0_20px_rgba(232,163,61,0.4)] border border-[#E8A33D]/60 p-0.5 bg-black/50 transition-transform group-hover:scale-105" 
+            />
             <div>
               <span className="font-display text-lg sm:text-xl font-extrabold tracking-wide text-white group-hover:text-[#E8A33D] transition">
                 {settings.website_name || "AI STORE"}
@@ -886,23 +956,83 @@ export default function ProductDetailsPage() {
                         {product.name}
                       </h1>
 
+                      {/* Subscription Duration Selector */}
+                      {product.plans && product.plans.length > 0 && (
+                        <div className="rounded-2xl border border-white/15 bg-gradient-to-b from-[#1a1f2c] to-[#12151e] p-4 sm:p-5 space-y-3 shadow-inner">
+                          <div className="flex items-center justify-between">
+                            <label className="text-xs sm:text-sm font-bold text-white flex items-center gap-1.5">
+                              <span className="text-[#E8A33D]">⚡</span> اختر مدة الاشتراك (Subscription Period):
+                            </label>
+                            <span className="text-[11px] text-[#E8A33D] font-mono font-bold">
+                              {product.plans.length} مدد متوفرة
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 max-h-80 overflow-y-auto pr-1">
+                            {product.plans.map((plan, idx) => {
+                              const isSelected = selectedPlanIndex === idx;
+                              return (
+                                <button
+                                  key={idx}
+                                  type="button"
+                                  onClick={() => setSelectedPlanIndex(idx)}
+                                  className={`relative flex flex-col items-start justify-between p-3.5 rounded-2xl border text-right transition active:scale-[0.98] ${
+                                    isSelected
+                                      ? "border-[#E8A33D] bg-[#E8A33D]/15 shadow-[0_0_20px_rgba(232,163,61,0.25)] ring-1 ring-[#E8A33D]"
+                                      : "border-white/10 bg-black/40 hover:border-white/25 hover:bg-black/60"
+                                  }`}
+                                >
+                                  {plan.discount_badge && (
+                                    <span className="absolute -top-2.5 left-2.5 inline-block rounded-full bg-emerald-500/90 text-white font-black text-[9px] px-2 py-0.5 shadow-md">
+                                      {plan.discount_badge}
+                                    </span>
+                                  )}
+                                  <span className={`text-xs sm:text-sm font-extrabold ${isSelected ? "text-white" : "text-white/80"}`}>
+                                    {plan.name}
+                                  </span>
+                                  <div className="mt-2 flex flex-col items-start gap-0.5">
+                                    <div className="flex items-baseline gap-1.5">
+                                      <span className="text-sm sm:text-base font-black text-[#E8A33D]">
+                                        {plan.price} {settings.currency || "ج.م"}
+                                      </span>
+                                      {plan.price_usd ? (
+                                        <span className="text-xs font-bold text-emerald-400 font-mono">
+                                          / {plan.price_usd}$
+                                        </span>
+                                      ) : null}
+                                    </div>
+                                    {plan.original_price ? (
+                                      <span className="text-[10px] text-white/40 line-through">
+                                        {plan.original_price} {settings.currency || "ج.م"} {plan.original_price_usd ? `/ ${plan.original_price_usd}$` : ""}
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
                       {/* Price Box */}
                       <div className="flex flex-wrap items-baseline gap-3 rounded-2xl border border-[#E8A33D]/30 bg-gradient-to-r from-[#1a1f2c] to-[#12151e] p-4 sm:p-5 shadow-inner">
                         <div>
-                          <span className="text-xs text-white/60 block mb-0.5">السعر الرسمي للباقة:</span>
+                          <span className="text-xs text-white/60 block mb-0.5">
+                            {currentPlan ? `السعر لمدة (${currentPlan.name}):` : "السعر الرسمي للباقة:"}
+                          </span>
                           <span className="font-display text-2xl sm:text-3xl font-black text-[#E8A33D] drop-shadow-[0_2px_10px_rgba(232,163,61,0.4)]">
-                            {formatPrice(product.price, settings.currency, Number(settings.usdt_rate))}
+                            {formatPrice(activePrice, activePriceUsd, settings.currency)}
                           </span>
                         </div>
-                        {product.original_price ? (
+                        {activeOriginalPrice ? (
                           <div className="text-sm text-white/40 line-through font-mono">
-                            {product.original_price} {settings.currency}
+                            {activeOriginalPrice} {settings.currency} {activeOriginalPriceUsd ? `/ ${activeOriginalPriceUsd}$` : ""}
                           </div>
                         ) : null}
                       </div>
 
                       {product.detail && (
-                        <p className="text-sm sm:text-base font-medium text-white/85 leading-relaxed bg-black/40 border border-white/10 rounded-2xl p-4">
+                        <p className="text-base sm:text-lg font-medium text-white/90 leading-relaxed bg-black/40 border border-white/10 rounded-2xl p-4">
                           {product.detail}
                         </p>
                       )}
@@ -986,7 +1116,7 @@ export default function ProductDetailsPage() {
                 </div>
               </div>
 
-              <div className="space-y-4 text-sm sm:text-base font-normal text-white/90 leading-relaxed font-sans">
+              <div className="space-y-4 text-base sm:text-[17px] font-normal text-white/90 leading-relaxed font-sans">
                 {longDescContent.map((paragraph, index) => {
                   const isBullet = paragraph.startsWith("-") || paragraph.startsWith("•") || paragraph.startsWith("*") || paragraph.startsWith("✨") || paragraph.startsWith("✓");
                   return (
@@ -1045,9 +1175,9 @@ export default function ProductDetailsPage() {
                     return (
                       <article
                         key={p.id}
-                        className="flex flex-col overflow-hidden rounded-3xl border border-white/15 bg-gradient-to-b from-[#1a1f2c] to-[#11141d] shadow-[0_15px_35px_rgba(0,0,0,0.8)] transition hover:scale-[1.02] hover:border-[#E8A33D]/60"
+                        className="flex flex-col h-full overflow-hidden rounded-3xl border border-white/15 bg-gradient-to-b from-[#1a1f2c] to-[#11141d] shadow-[0_15px_35px_rgba(0,0,0,0.8)] transition hover:scale-[1.02] hover:border-[#E8A33D]/60"
                       >
-                        <Link href={`/products/${p.id}`} className="h-48 w-full relative overflow-hidden bg-black flex items-center justify-center p-4 group">
+                        <Link href={`/products/${p.id}`} className="h-52 w-full relative overflow-hidden bg-black flex items-center justify-center p-4 group shrink-0">
                           <div className="absolute top-3.5 right-3.5 z-10 inline-flex items-center rounded-full bg-black/85 backdrop-blur-md border border-white/20 px-3 py-1 text-xs font-bold text-white">
                             <span dir="rtl">المبيعات <strong className="text-[#E8A33D] font-mono font-black">{(Number(p.fake_sales_count) || 0) + (Number(p.sales_count) || 0)}</strong></span>
                           </div>
@@ -1063,12 +1193,12 @@ export default function ProductDetailsPage() {
                             onError={(e) => { e.currentTarget.style.display = 'none'; }}
                           />
                         </Link>
-                        <div className="flex flex-col items-center text-center gap-2 p-5 pb-3">
-                          <Link href={`/products/${p.id}`}>
-                            <h3 className="font-display text-lg font-bold text-white hover:text-[#E8A33D] transition">{p.name}</h3>
+                        <div className="flex flex-col items-center text-center gap-2 p-5 pb-3.5 flex-1">
+                          <Link href={`/products/${p.id}`} className="w-full">
+                            <h3 className="font-display text-base sm:text-lg font-bold text-white hover:text-[#E8A33D] transition truncate">{p.name}</h3>
                           </Link>
-                          <div className="font-display text-base font-extrabold text-[#E8A33D]">
-                            {formatPrice(p.price, settings.currency, Number(settings.usdt_rate))}
+                          <div className="font-display text-sm sm:text-base font-extrabold text-[#E8A33D] min-h-[32px] flex items-center justify-center">
+                            {formatPrice(p.price, p.price_usd, settings.currency)}
                           </div>
                         </div>
                         <div className="mt-auto p-4 pt-0">
@@ -1076,7 +1206,7 @@ export default function ProductDetailsPage() {
                             href={`/products/${p.id}`}
                             className="w-full flex items-center justify-center rounded-2xl border border-[#E8A33D]/50 bg-[#161a25] py-2.5 text-xs font-bold text-[#E8A33D] hover:bg-[#E8A33D]/20 transition"
                           >
-                            عرض التفاصيل الكاملة
+                            عرض التفاصيل والمدد
                           </Link>
                         </div>
                       </article>
@@ -1619,31 +1749,34 @@ export default function ProductDetailsPage() {
                 <div className="text-center text-white/50 py-12 text-lg">السلة فارغة حالياً</div>
               ) : (
                 <div className="flex flex-col gap-4">
-                  {Object.entries(cart).map(([id, qty]) => {
-                    const p = allProducts.find((x) => x.id === id) || (product?.id === id ? product : null);
-                    if (!p) return null;
+                  {Object.entries(cart).map(([cartKey, qty]) => {
+                    const itemInfo = getCartItemInfo(cartKey, allProducts, product);
+                    if (!itemInfo) return null;
                     return (
-                      <div key={id} className="flex flex-col bg-white/[0.04] p-4 rounded-2xl border border-white/10 shadow-[0_8px_20px_rgba(0,0,0,0.4)]">
+                      <div key={cartKey} className="flex flex-col bg-white/[0.04] p-4 rounded-2xl border border-white/10 shadow-[0_8px_20px_rgba(0,0,0,0.4)]">
                         <div className="flex items-start justify-between">
                           <div className="flex items-center gap-3">
-                            <img src={p.image} alt={p.name} className="w-12 h-12 object-contain bg-black/60 rounded-xl p-1 border border-white/10" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                            <img src={itemInfo.image || "/p3.png"} alt={itemInfo.name} className="w-12 h-12 object-contain bg-black/60 rounded-xl p-1 border border-white/10" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                             <div>
-                              <h4 className="text-white font-bold text-base">{p.name}</h4>
+                              <h4 className="text-white font-bold text-base">{itemInfo.name}</h4>
                               <div className="text-[#E8A33D] text-xs font-semibold mt-1">
-                                {formatPrice(p.price, settings.currency, Number(settings.usdt_rate))}
+                                {formatPrice(itemInfo.price, itemInfo.price_usd, settings.currency)}
                               </div>
                             </div>
                           </div>
-                          <button onClick={() => removeFromCart(id)} className="text-red-400 p-2 hover:bg-red-500/10 rounded-xl transition"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
+                          <button onClick={() => removeFromCart(cartKey)} className="text-red-400 p-2 hover:bg-red-500/10 rounded-xl transition"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
                         </div>
                         <div className="flex items-center justify-between mt-4 pt-3 border-t border-white/5">
                           <div className="flex items-center bg-black/60 rounded-xl p-1 border border-white/10 shadow-inner">
-                            <button onClick={() => decreaseQuantity(id)} className="w-9 h-9 text-white font-bold hover:text-[#E8A33D] transition">-</button>
+                            <button onClick={() => decreaseQuantity(cartKey)} className="w-9 h-9 text-white font-bold hover:text-[#E8A33D] transition">-</button>
                             <span className="w-10 text-center text-white font-extrabold">{qty}</span>
-                            <button onClick={() => addToCart(id)} className="w-9 h-9 text-white font-bold hover:text-[#E8A33D] transition">+</button>
+                            <button onClick={() => {
+                              const { baseId, planIndex } = parseCartKey(cartKey);
+                              addToCart(baseId, planIndex);
+                            }} className="w-9 h-9 text-white font-bold hover:text-[#E8A33D] transition">+</button>
                           </div>
                           <div className="text-[#E8A33D] font-extrabold text-sm">
-                             {formatPrice(typeof p.price === 'number' ? p.price * qty : 0, settings.currency, Number(settings.usdt_rate))}
+                             {formatPrice(itemInfo.price * qty, itemInfo.price_usd * qty, settings.currency)}
                           </div>
                         </div>
                       </div>
@@ -1659,7 +1792,7 @@ export default function ProductDetailsPage() {
                   <span className="font-bold text-xl text-white">الإجمالي الكلي:</span>
                   <div className="text-right flex flex-col items-end">
                     <span className="font-extrabold text-2xl text-[#E8A33D] drop-shadow">
-                      {formatPrice(cartTotal, settings.currency, Number(settings.usdt_rate))}
+                      {formatPrice(cartTotal, cartTotalUsd, settings.currency)}
                     </span>
                   </div>
                 </div>
@@ -1677,8 +1810,14 @@ export default function ProductDetailsPage() {
       </button>
 
       {/* Footer */}
-      <footer className="mt-20 border-t border-white/10 bg-black/40 py-8 text-center text-xs text-white/40">
-        <p>© {new Date().getFullYear()} {settings.website_name || "AI STORE"} — جميع الحقوق محفوظة.</p>
+      <footer className="mt-20 border-t border-white/10 bg-black/40 py-10 text-center text-xs text-white/50 flex flex-col items-center gap-3">
+        <img 
+          src="/logo.png" 
+          alt={settings.website_name || "AI PRO EGYPT"} 
+          className="h-12 w-12 rounded-full object-contain border border-[#E8A33D]/40 p-0.5 bg-black/50" 
+        />
+        <p className="font-semibold text-white/80">{settings.website_name || "AI STORE"}</p>
+        <p>© {new Date().getFullYear()} — جميع الحقوق محفوظة.</p>
       </footer>
     </div>
   );

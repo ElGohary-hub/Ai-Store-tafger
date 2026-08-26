@@ -7,13 +7,24 @@ type AdminInfo = {
   role: string;
 };
 
+type SubscriptionPlan = {
+  name: string;
+  price: number;
+  price_usd?: number;
+  original_price?: number;
+  original_price_usd?: number;
+  discount_badge?: string;
+};
+
 type Product = {
   id: string | number;
   sku: string;
   name: string;
   description: string;
   price: number;
+  price_usd?: number;
   original_price: number;
+  original_price_usd?: number;
   discount_enabled: number;
   discount_percentage: number;
   featured: number;
@@ -30,6 +41,7 @@ type Product = {
   long_description?: string;
   warranty?: string;
   category_name?: string;
+  plans?: SubscriptionPlan[];
 };
 
 type Category = {
@@ -383,7 +395,9 @@ export default function AdminPanel({ admin }: { admin: AdminInfo }) {
         name: productForm.name,
         description: productForm.description,
         price: Number(productForm.price || 0),
+        price_usd: Number(productForm.price_usd || 0),
         original_price: Number(productForm.original_price || 0),
+        original_price_usd: Number(productForm.original_price_usd || 0),
         discount_enabled: productForm.discount_enabled ? 1 : 0,
         discount_percentage: Number(productForm.discount_percentage || 0),
         featured: productForm.featured ? 1 : 0,
@@ -399,12 +413,13 @@ export default function AdminPanel({ admin }: { admin: AdminInfo }) {
         fake_sales_count: Number(productForm.fake_sales_count || 0),
         long_description: productForm.long_description || productForm.description || "",
         warranty: productForm.warranty || "",
+        plans: productForm.plans || [],
       }),
     });
     if (response.ok) {
       setShowProductModal(false);
       setEditingProduct(null);
-      setProductForm({ visible: 1, discount_enabled: 0, featured: 0, best_seller: 0, is_new: 0, stock: 0, sort_order: 0, sales_count: 0, fake_sales_count: 0, long_description: "", description: "", warranty: "" });
+      setProductForm({ visible: 1, discount_enabled: 0, featured: 0, best_seller: 0, is_new: 0, stock: 0, sort_order: 0, sales_count: 0, fake_sales_count: 0, long_description: "", description: "", warranty: "", plans: [] });
       refreshAll();
     } else {
       const data = await response.json();
@@ -800,17 +815,24 @@ export default function AdminPanel({ admin }: { admin: AdminInfo }) {
               )}
             </button>
 
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5 sm:gap-2">
-                <span className="flex h-2 w-2 sm:h-2.5 sm:w-2.5 shrink-0 rounded-full bg-[#E8A33D] animate-pulse shadow-[0_0_8px_#E8A33D]"></span>
-                <h1 className="text-sm sm:text-lg font-extrabold text-[#E8A33D] tracking-wide drop-shadow-[0_2px_8px_rgba(232,163,61,0.4)] truncate flex items-center gap-1.5">
-                  <span>AI STORE</span>
-                  <span className="text-white text-[10px] sm:text-xs font-bold px-1.5 sm:px-2 py-0.5 rounded-full bg-white/10 border border-white/15 uppercase tracking-wider">Admin</span>
-                </h1>
+            <div className="flex items-center gap-2.5 min-w-0">
+              <img 
+                src="/logo.png" 
+                alt="Logo" 
+                className="h-8 w-8 sm:h-9 sm:w-9 rounded-full object-contain border border-[#E8A33D]/60 p-0.5 bg-black/50 shadow-md shrink-0" 
+              />
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <span className="flex h-2 w-2 sm:h-2.5 sm:w-2.5 shrink-0 rounded-full bg-[#E8A33D] animate-pulse shadow-[0_0_8px_#E8A33D]"></span>
+                  <h1 className="text-sm sm:text-lg font-extrabold text-[#E8A33D] tracking-wide drop-shadow-[0_2px_8px_rgba(232,163,61,0.4)] truncate flex items-center gap-1.5">
+                    <span>AI STORE</span>
+                    <span className="text-white text-[10px] sm:text-xs font-bold px-1.5 sm:px-2 py-0.5 rounded-full bg-white/10 border border-white/15 uppercase tracking-wider">Admin</span>
+                  </h1>
+                </div>
+                <p className="hidden text-xs text-white/50 sm:block truncate">
+                  Signed in as <span className="font-semibold text-[#E8A33D]">{admin.email}</span> ({admin.role})
+                </p>
               </div>
-              <p className="hidden text-xs text-white/50 sm:block truncate">
-                Signed in as <span className="font-semibold text-[#E8A33D]">{admin.email}</span> ({admin.role})
-              </p>
             </div>
           </div>
 
@@ -1164,7 +1186,9 @@ export default function AdminPanel({ admin }: { admin: AdminInfo }) {
                           </div>
                           <p className="font-bold text-white text-sm line-clamp-1">{product.name}</p>
                           <div className="mt-1 flex items-baseline gap-2">
-                            <span className="font-extrabold text-[#E8A33D] text-sm">{product.price} {settings.currency || "ج.م"}</span>
+                            <span className="font-extrabold text-[#E8A33D] text-sm">
+                              {product.price} ج.م <span className="text-emerald-400 text-xs font-bold font-mono">/ {product.price_usd || 0}$</span>
+                            </span>
                             {product.discount_enabled ? (
                               <span className="text-[10px] font-bold text-emerald-400">-{product.discount_percentage}% OFF</span>
                             ) : null}
@@ -1264,7 +1288,9 @@ export default function AdminPanel({ admin }: { admin: AdminInfo }) {
                               </div>
                             </td>
                             <td className="px-4 py-3.5">
-                              <p className="font-extrabold text-[#E8A33D]">{product.price} {settings.currency || "ج.م"}</p>
+                              <p className="font-extrabold text-[#E8A33D]">
+                                {product.price} ج.م <span className="text-emerald-400 font-bold text-xs font-mono">/ {product.price_usd || 0}$</span>
+                              </p>
                               {product.discount_enabled ? (
                                 <p className="text-xs text-emerald-400">-{product.discount_percentage}% off</p>
                               ) : null}
@@ -2478,50 +2504,7 @@ export default function AdminPanel({ admin }: { admin: AdminInfo }) {
                     </div>
                   </div>
 
-                  {/* 2. Store Identity & Rates */}
-                  <div className="rounded-2xl sm:rounded-3xl border border-white/15 bg-gradient-to-b from-[#1a1f2c] to-[#11141d] p-5 sm:p-7 shadow-[0_15px_35px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.08)] space-y-5">
-                    <div className="flex items-center gap-3 border-b border-white/10 pb-3.5">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-500/15 border border-sky-500/30 text-sky-400 text-lg">
-                        🏪
-                      </div>
-                      <div>
-                        <h3 className="text-base sm:text-lg font-extrabold text-white">Store Identity & Currency (هوية المتجر والعملة)</h3>
-                        <p className="text-xs text-white/60">Configure your store brand name and currency exchange calculations.</p>
-                      </div>
-                    </div>
-
-                    <div className="grid gap-4 sm:grid-cols-3">
-                      <div>
-                        <label className="block text-xs sm:text-sm font-semibold text-white/80">Store Name (اسم المتجر)</label>
-                        <input
-                          value={siteForm.website_name}
-                          onChange={(e) => setSiteForm({ ...siteForm, website_name: e.target.value })}
-                          placeholder="AI STORE"
-                          className="mt-1.5 w-full rounded-2xl border border-white/15 bg-black/60 px-4 py-2.5 sm:py-3 text-sm text-white outline-none focus:border-[#E8A33D] shadow-inner transition placeholder:text-white/30"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs sm:text-sm font-semibold text-white/80">Currency Symbol (رمز العملة)</label>
-                        <input
-                          value={siteForm.currency}
-                          onChange={(e) => setSiteForm({ ...siteForm, currency: e.target.value })}
-                          placeholder="ج.م or $"
-                          className="mt-1.5 w-full rounded-2xl border border-white/15 bg-black/60 px-4 py-2.5 sm:py-3 text-sm text-white outline-none focus:border-[#E8A33D] shadow-inner transition placeholder:text-white/30"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs sm:text-sm font-semibold text-white/80">1 USDT Exchange Rate (سعر 1 دولار USDT)</label>
-                        <input
-                          value={siteForm.usdt_rate}
-                          onChange={(e) => setSiteForm({ ...siteForm, usdt_rate: e.target.value })}
-                          placeholder="50"
-                          className="mt-1.5 w-full rounded-2xl border border-white/15 bg-black/60 px-4 py-2.5 sm:py-3 text-sm text-white outline-none focus:border-[#E8A33D] font-mono shadow-inner transition placeholder:text-white/30"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 3. Support & Social Channels */}
+                  {/* 2. Support & Social Channels */}
                   <div className="rounded-2xl sm:rounded-3xl border border-white/15 bg-gradient-to-b from-[#1a1f2c] to-[#11141d] p-5 sm:p-7 shadow-[0_15px_35px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.08)] space-y-5">
                     <div className="flex items-center gap-3 border-b border-white/10 pb-3.5">
                       <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-lg">
@@ -2750,8 +2733,10 @@ export default function AdminPanel({ admin }: { admin: AdminInfo }) {
                 {[
                   { label: "SKU", key: "sku", type: "text", placeholder: "e.g. AI-PRO-01" },
                   { label: "Product Name", key: "name", type: "text", placeholder: "e.g. ChatGPT Plus Account" },
-                  { label: "Price", key: "price", type: "number", placeholder: "250" },
-                  { label: "Original Price", key: "original_price", type: "number", placeholder: "350" },
+                  { label: "Price in EGP (السعر بالجنيه ج.م)", key: "price", type: "number", placeholder: "250" },
+                  { label: "Price in USD (السعر بالدولار $)", key: "price_usd", type: "number", placeholder: "5" },
+                  { label: "Original Price EGP (السعر الأصلي ج.م)", key: "original_price", type: "number", placeholder: "350" },
+                  { label: "Original Price USD (السعر الأصلي $)", key: "original_price_usd", type: "number", placeholder: "7" },
                   { label: "Discount %", key: "discount_percentage", type: "number", placeholder: "20" },
                   { label: "Stock Quantity", key: "stock", type: "number", placeholder: "100" },
                   { label: "Promo / Fake Sales (مبيعات وهمية ترويجية)", key: "fake_sales_count", type: "number", placeholder: "0" },
@@ -2769,13 +2754,162 @@ export default function AdminPanel({ admin }: { admin: AdminInfo }) {
                       onChange={(event) =>
                         setProductForm({
                           ...productForm,
-                          [key]: type === "number" ? Number(event.target.value) : event.target.value,
+                          [key]: type === "number" ? (event.target.value === "" ? "" : Number(event.target.value)) : event.target.value,
                         })
                       }
                       className="mt-1 w-full rounded-xl border border-white/15 bg-black/60 px-3 py-2 text-xs sm:text-sm text-white outline-none focus:border-[#E8A33D] shadow-inner placeholder:text-white/30"
                     />
                   </div>
                 ))}
+              </div>
+
+              {/* Subscription Plans & Durations Section */}
+              <div className="rounded-2xl border border-white/15 bg-black/40 p-4 space-y-3 shadow-inner">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <div>
+                    <label className="block text-xs sm:text-sm font-bold text-[#E8A33D] flex items-center gap-1.5">
+                      <span>⚡</span> مدد وباقات الاشتراك (Subscription Periods & Plans)
+                    </label>
+                    <p className="text-[11px] text-white/50 mt-0.5">
+                      إذا كان المنتج يوفر عدة مدد (مثال: شهر، 3 شهور، سنة)، أضفها هنا بأسعارها المخصصة بالجنيه والدولار. (اختياري)
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const currentPlans = productForm.plans || [];
+                      setProductForm({
+                        ...productForm,
+                        plans: [
+                          ...currentPlans,
+                          { name: "", price: 0, price_usd: 0, original_price: 0, original_price_usd: 0, discount_badge: "" },
+                        ],
+                      });
+                    }}
+                    className="shrink-0 self-start sm:self-auto flex items-center gap-1 rounded-xl bg-[#E8A33D]/20 hover:bg-[#E8A33D]/30 border border-[#E8A33D]/40 text-[#E8A33D] px-3 py-1.5 text-xs font-bold transition active:scale-95"
+                  >
+                    <span>+</span> إضافة مدة/باقة
+                  </button>
+                </div>
+
+                {productForm.plans && productForm.plans.length > 0 ? (
+                  <div className="space-y-2.5 mt-2 max-h-96 overflow-y-auto pr-1">
+                    {productForm.plans.map((plan, pIdx) => (
+                      <div
+                        key={pIdx}
+                        className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 p-3 rounded-xl border border-white/10 bg-black/60 shadow-inner"
+                      >
+                        <div className="flex-1 min-w-[130px]">
+                          <label className="block text-[10px] text-white/60 mb-0.5 font-semibold">اسم المدة / الباقة</label>
+                          <input
+                            type="text"
+                            placeholder="مثال: شهر واحد (1 Month)"
+                            value={plan.name}
+                            onChange={(e) => {
+                              const updated = [...(productForm.plans || [])];
+                              updated[pIdx] = { ...updated[pIdx], name: e.target.value };
+                              setProductForm({ ...productForm, plans: updated });
+                            }}
+                            className="w-full rounded-lg border border-white/15 bg-black/50 px-2.5 py-1.5 text-xs text-white outline-none focus:border-[#E8A33D]"
+                          />
+                        </div>
+
+                        <div className="w-full sm:w-24">
+                          <label className="block text-[10px] text-[#E8A33D] mb-0.5 font-semibold">السعر (ج.م)</label>
+                          <input
+                            type="number"
+                            placeholder="50"
+                            value={plan.price || ""}
+                            onChange={(e) => {
+                              const updated = [...(productForm.plans || [])];
+                              updated[pIdx] = { ...updated[pIdx], price: Number(e.target.value) };
+                              setProductForm({ ...productForm, plans: updated });
+                            }}
+                            className="w-full rounded-lg border border-white/15 bg-black/50 px-2.5 py-1.5 text-xs text-[#E8A33D] font-bold outline-none focus:border-[#E8A33D] font-mono"
+                          />
+                        </div>
+
+                        <div className="w-full sm:w-24">
+                          <label className="block text-[10px] text-emerald-400 mb-0.5 font-semibold">السعر ($ USD)</label>
+                          <input
+                            type="number"
+                            placeholder="1"
+                            step="any"
+                            value={plan.price_usd || ""}
+                            onChange={(e) => {
+                              const updated = [...(productForm.plans || [])];
+                              updated[pIdx] = { ...updated[pIdx], price_usd: Number(e.target.value) };
+                              setProductForm({ ...productForm, plans: updated });
+                            }}
+                            className="w-full rounded-lg border border-white/15 bg-black/50 px-2.5 py-1.5 text-xs text-emerald-300 font-bold outline-none focus:border-emerald-400 font-mono"
+                          />
+                        </div>
+
+                        <div className="w-full sm:w-20">
+                          <label className="block text-[10px] text-white/60 mb-0.5 font-semibold">أصلي (ج.م)</label>
+                          <input
+                            type="number"
+                            placeholder="70"
+                            value={plan.original_price || ""}
+                            onChange={(e) => {
+                              const updated = [...(productForm.plans || [])];
+                              updated[pIdx] = { ...updated[pIdx], original_price: Number(e.target.value) };
+                              setProductForm({ ...productForm, plans: updated });
+                            }}
+                            className="w-full rounded-lg border border-white/15 bg-black/50 px-2.5 py-1.5 text-xs text-white/70 outline-none focus:border-[#E8A33D] font-mono"
+                          />
+                        </div>
+
+                        <div className="w-full sm:w-20">
+                          <label className="block text-[10px] text-white/60 mb-0.5 font-semibold">أصلي ($)</label>
+                          <input
+                            type="number"
+                            placeholder="1.5"
+                            step="any"
+                            value={plan.original_price_usd || ""}
+                            onChange={(e) => {
+                              const updated = [...(productForm.plans || [])];
+                              updated[pIdx] = { ...updated[pIdx], original_price_usd: Number(e.target.value) };
+                              setProductForm({ ...productForm, plans: updated });
+                            }}
+                            className="w-full rounded-lg border border-white/15 bg-black/50 px-2.5 py-1.5 text-xs text-white/70 outline-none focus:border-emerald-400 font-mono"
+                          />
+                        </div>
+
+                        <div className="w-full sm:w-24">
+                          <label className="block text-[10px] text-white/60 mb-0.5 font-semibold">شارة الخصم</label>
+                          <input
+                            type="text"
+                            placeholder="وفر 20%"
+                            value={plan.discount_badge || ""}
+                            onChange={(e) => {
+                              const updated = [...(productForm.plans || [])];
+                              updated[pIdx] = { ...updated[pIdx], discount_badge: e.target.value };
+                              setProductForm({ ...productForm, plans: updated });
+                            }}
+                            className="w-full rounded-lg border border-white/15 bg-black/50 px-2.5 py-1.5 text-xs text-white/70 outline-none focus:border-[#E8A33D]"
+                          />
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = (productForm.plans || []).filter((_, i) => i !== pIdx);
+                            setProductForm({ ...productForm, plans: updated });
+                          }}
+                          className="self-end sm:self-center mt-2 sm:mt-4 p-2 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/40 text-xs transition"
+                          title="حذف هذه الباقة"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-white/10 bg-black/20 p-3 text-center text-xs text-white/40">
+                    لم تتم إضافة باقات مخصصة. سيتم استخدام السعر الأساسي للمنتج (بالجنيه والدولار).
+                  </div>
+                )}
               </div>
 
               <div>
