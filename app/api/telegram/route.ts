@@ -17,33 +17,47 @@ bot.command('start', (ctx) => {
 
 bot.action('menu_products', async (ctx) => {
     try {
-        const products = await prisma.product.findMany({
-            where: { stock: { gt: 0 } }
-        });
+        // سحب كل المنتجات بدون الفلترة بكلمة stock
+        const products = await prisma.product.findMany(); 
 
         let buttons = [];
+        
         for (let i = 0; i < products.length; i += 2) {
             let row = [];
-            row.push(Markup.button.callback(`${products[i].name} (${products[i].stock})`, `prod_${products[i].id}`));
+            // عرض اسم المنتج فقط بدون رقم المخزون
+            row.push(Markup.button.callback(products[i].name, `prod_${products[i].id}`));
+            
             if (products[i+1]) {
-                row.push(Markup.button.callback(`${products[i+1].name} (${products[i+1].stock})`, `prod_${products[i+1].id}`));
+                row.push(Markup.button.callback(products[i+1].name, `prod_${products[i+1].id}`));
             }
             buttons.push(row);
         }
         
+        buttons.push([Markup.button.callback('🔙 القائمة الرئيسية', 'main_menu')]);
+
         await ctx.editMessageText(`اختر تطبيقاً لعرض باقاته:`, Markup.inlineKeyboard(buttons));
     } catch (error) {
-        ctx.reply("حدث خطأ.");
+        console.error("Error fetching products:", error);
+        ctx.reply("حدث خطأ أثناء جلب المنتجات. جرب مرة أخرى.");
     }
 });
 
-// هذا الجزء هو الذي يستقبل الرسائل من تليجرام
+bot.action('main_menu', (ctx) => {
+    const userId = ctx.from?.id;
+    const name = ctx.from?.first_name;
+    ctx.editMessageText(`👋 مرحباً بك في المتجر يا ${name}!\n\n🆔 الأيدي: ${userId}\n💵 الرصيد: $0.00`, Markup.inlineKeyboard([
+        [Markup.button.callback('المنتجات 🛍', 'menu_products')],
+        [Markup.button.callback('المحفظة 💰', 'menu_wallet')]
+    ]));
+});
+
 export async function POST(req: Request) {
     try {
         const body = await req.json();
         await bot.handleUpdate(body);
         return NextResponse.json({ status: 'Success' });
     } catch (error) {
+        console.error("Webhook Error:", error);
         return NextResponse.json({ status: 'Error' }, { status: 500 });
     }
 }
