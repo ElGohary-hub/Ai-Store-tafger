@@ -2,7 +2,16 @@ import { NextResponse } from 'next/server';
 import { Telegraf, Markup } from 'telegraf';
 import { PrismaClient } from '@prisma/client';
 
-const prisma = new PrismaClient();
+// ----- التعديلات الجديدة لحل مشكلة Vercel -----
+export const dynamic = 'force-dynamic'; // نمنع Vercel من تشغيل الملف وقت البناء
+export const runtime = 'nodejs';        // نجبر Vercel يستخدم بيئة Node.js العادية
+
+// تهيئة الداتابيز بطريقة آمنة لـ Next.js
+const globalForPrisma = global as unknown as { prisma: PrismaClient };
+const prisma = globalForPrisma.prisma || new PrismaClient();
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+// ----------------------------------------------
+
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN as string);
 
 bot.command('start', (ctx) => {
@@ -17,16 +26,12 @@ bot.command('start', (ctx) => {
 
 bot.action('menu_products', async (ctx) => {
     try {
-        // سحب كل المنتجات بدون الفلترة بكلمة stock
         const products = await prisma.product.findMany(); 
 
         let buttons = [];
-        
         for (let i = 0; i < products.length; i += 2) {
             let row = [];
-            // عرض اسم المنتج فقط بدون رقم المخزون
             row.push(Markup.button.callback(products[i].name, `prod_${products[i].id}`));
-            
             if (products[i+1]) {
                 row.push(Markup.button.callback(products[i+1].name, `prod_${products[i+1].id}`));
             }
@@ -51,6 +56,7 @@ bot.action('main_menu', (ctx) => {
     ]));
 });
 
+// استقبال الطلبات من تليجرام
 export async function POST(req: Request) {
     try {
         const body = await req.json();
